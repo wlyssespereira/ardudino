@@ -11,10 +11,11 @@ The rules are pretty simple.
   
 * In game:
   * Menu "Drink":
-      - 
+    
   * Menu "Food":
-      -
-  * Menu "Light": 
+    
+  * Menu "Light":
+    
   * Menu "Caress": 
   * Menu "Status": 
   * Menu "Play": 
