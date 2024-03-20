@@ -1,5 +1,5 @@
 # Ardudino
-<img src="/assets/banner.png" data-canonical-src="/assets/banner.png" width="700" height="257" />
+<img src="/assets/banner1.png" data-canonical-src="/assets/banner1.png" width="700" height="257" />
 
 An Arduboy game that simulates a virtual pet
 
