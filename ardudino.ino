@@ -323,7 +323,6 @@ void drawTextMenus(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rect
 
 // Função para desenhar a tela inicial.
 void drawStartScreen(uint8_t x, uint8_t y) {
-
   uint8_t startScrSprSize = 4;
 
   // Ajuste da posição para desenhar o sprite
@@ -331,17 +330,14 @@ void drawStartScreen(uint8_t x, uint8_t y) {
   y -= 10;
 
   for (uint8_t spr = 0; spr < startScrSprSize; spr++) { 
-
     uint8_t creatPosArr[4][2];
     buildCreatPosArr(x, y, creatPosArr);
 
     for (uint8_t i = 0; i < 4; i++) {
       drawCustomBitmap(creatPosArr[i] , startScreenSprites[spr][i], 10, 10);
     }
-
     x += 16;
   }
-
 }
 
 // Função para desenhar o bichinho
