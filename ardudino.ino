@@ -42,12 +42,14 @@ const unsigned long humorDuration = 10000;
 
 unsigned long previousTime;
 
+bool isStartScreen = true;
 bool isControlsBlocked = false;
 bool isMenuSelected = false;
 bool isLightOn = true;
 bool isDoingCaress = false;
 bool isDrinkingWater = false;
 bool isInFoodMenu = false;
+
 
 void setup() {
   arduboy.begin();
@@ -59,7 +61,21 @@ void loop() {
   if (!arduboy.nextFrame()) {
     return;
   }
+  
   arduboy.pollButtons();
+
+  if(isStartScreen) {
+    arduboy.clear();
+    drawStartScreen(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+    arduboy.setCursor(60, 40);
+    arduboy.print(F("Press A..."));
+    arduboy.display();
+    // Aguarda até que o botão B seja pressionado
+    if (arduboy.pressed(A_BUTTON)) {
+      isStartScreen = false;
+    }
+    return;
+  }
 
   // Limpa a tela
   arduboy.clear();
@@ -304,6 +320,30 @@ void drawTextMenus(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rect
   arduboy.print(F("Turn Off"));
 }
 
+
+// Função para desenhar a tela inicial.
+void drawStartScreen(uint8_t x, uint8_t y) {
+
+  uint8_t startScrSprSize = 4;
+
+  // Ajuste da posição para desenhar o sprite
+  x -= 30;
+  y -= 10;
+
+  for (uint8_t spr = 0; spr < startScrSprSize; spr++) { 
+
+    uint8_t creatPosArr[4][2];
+    buildCreatPosArr(x, y, creatPosArr);
+
+    for (uint8_t i = 0; i < 4; i++) {
+      drawCustomBitmap(creatPosArr[i] , startScreenSprites[spr][i], 10, 10);
+    }
+
+    x += 16;
+  }
+
+}
+
 // Função para desenhar o bichinho
 void drawCreature(uint8_t x, uint8_t y) {
   if (isMenuSelected) {
@@ -320,7 +360,6 @@ void drawCreature(uint8_t x, uint8_t y) {
   for (uint8_t i = 0; i < 4; i++) {
     drawCustomBitmap(creatPosArr[i] , creatureMatSprites[creatureCurrentFrame][i], 10, 10);
   }
-
 }
 
 void drawHumorCreature(uint8_t x, uint8_t y) {
