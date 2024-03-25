@@ -1,3 +1,5 @@
+#include <Arduboy.h>
+
 #include <Arduboy2.h>
 #include "Menus.h"
 #include "Creature.h"
