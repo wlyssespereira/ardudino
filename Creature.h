@@ -1,8 +1,6 @@
 #ifndef CREATURE_H
 #define CREATURE_H
 
-#include <Arduboy2.h>
-
 // Constantes para a animação da criatura
 const uint8_t creatureSpriteWidth = 16;   // Largura do sprite
 const uint8_t creatureSpriteHeight = 16;  // Altura do sprite

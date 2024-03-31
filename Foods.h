@@ -1,8 +1,6 @@
 #ifndef FOODS_H
 #define FOODS_H
 
-#include <Arduboy2.h>
-
 enum SelectedLunch {
   HAMBURGER,
   MEAT,

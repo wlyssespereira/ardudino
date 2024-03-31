@@ -1,10 +1,7 @@
-#include <Arduboy.h>
-
 #include <Arduboy2.h>
 #include "Menus.h"
 #include "Creature.h"
 #include "Foods.h"
-
 
 Arduboy2 arduboy;
 
@@ -51,7 +48,6 @@ bool isLightOn = true;
 bool isDoingCaress = false;
 bool isDrinkingWater = false;
 bool isInFoodMenu = false;
-
 
 void setup() {
   arduboy.begin();
