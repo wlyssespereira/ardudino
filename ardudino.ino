@@ -9,7 +9,7 @@ Menu               currentMenu        = DRINK;
 SelectedSwitch     selectedSwitch     = MENU_TURN_ON;
 HumorCreature      humorCreature      = NONE;
 SelectedLunch      selectedLunch      = HAMBURGER;
-CreatureMenuStatus creatureMenuStatus = HAPPINESS;
+SelectedStatus     selectedStatus     = HAPPINESS;
 
 // Array associating the menu enum with the corresponding sprite
 const uint8_t* menuSprites[] = {
@@ -41,10 +41,10 @@ unsigned long lastFrameTime        = 0;
 unsigned long previousTime;
 
 // Creature status
-uint8_t happiness       = 0;  // Sprite
-uint8_t education       = 0;  // Sprite
-uint8_t hunger          = 2;  // Sprite
-uint8_t thirst          = 0;  // Sprite
+uint8_t happiness       = 1;  // Sprite
+uint8_t education       = 1;  // Sprite
+uint8_t hunger          = 1;  // Sprite
+uint8_t thirst          = 1;  // Sprite
 uint8_t weight          = 1;  // Text
 uint8_t age             = 0;  // Text
 uint8_t temperature     = 25; // Text
@@ -109,6 +109,7 @@ void loop() {
     drawSelectedMenu(iconXLeft + 15, centerY - rectHeight / 2 + 3, rectWidth + 10, rectHeight);
     navigateLightSwitches();
     navigateSelectedLunch();
+    navigateSelectedStatus();
   }
 
   // Execute the controls function
@@ -230,17 +231,70 @@ void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t r
 // Function to draw the status menu
 void drawStatusMenu(uint8_t x, uint8_t y) {
   // Adjust the position to draw the sprite
-  x += 30;
-  y += 15;
-
   uint8_t creatPosArr[4][2];
-  buildCreatPosArr(x, y, creatPosArr);
+  
+  // Draw the name of the selected status
+  arduboy.setCursor(x + 5, y + 2);
+  arduboy.print(statusNames[selectedStatus]);
 
-  for (uint8_t i = 0; i < 4; i++) {
-    drawCustomBitmap(creatPosArr[i] , foodSprites[selectedLunch][i], 10, 10);
+  if(selectedStatus < THIRST) {
+    drawStatusByIcons(x, y, creatPosArr);
+  } else {
+    drawStatusByText(x, y);
   }
+}
+
+void drawStatusByText(uint8_t x, uint8_t y) {
 
 }
+
+void drawStatusByIcons(uint8_t x, uint8_t y, uint8_t creatPosArr[][2]) {
+  uint8_t counter; 
+  switch (selectedStatus) {
+    case HAPPINESS:
+      counter = happiness;
+      break;
+    case EDUCATION:
+      counter = happiness;
+      break;
+    case HUNGER:
+      counter = hunger;
+      break;
+    case THIRST:
+      counter = thirst;
+      break;
+    default:
+      return;
+  }
+
+  x += 20;
+  y += 10;
+  buildCreatPosArr(x, y, creatPosArr);
+  drawStatusSprites(creatPosArr);
+
+  x += 30;
+  y += 0;
+  buildCreatPosArr(x, y, creatPosArr);
+  drawStatusSprites(creatPosArr);
+
+  x -= 30;
+  y += 15;
+  buildCreatPosArr(x, y, creatPosArr);
+  drawStatusSprites(creatPosArr);
+
+  x += 30;
+  y += 0;
+  buildCreatPosArr(x, y, creatPosArr);
+  drawStatusSprites(creatPosArr);
+}
+
+// Function to draw creature sprites
+void drawStatusSprites(uint8_t creatPosArr[][2]) {
+  for (uint8_t i = 0; i < 4; i++) {
+    drawCustomBitmap(creatPosArr[i], statusSprites[selectedStatus][i], 10, 10);
+  }
+}
+
 
 // Function to draw the food menu
 void drawFoodMenu(uint8_t x, uint8_t y) {
@@ -301,6 +355,20 @@ void navigateSelectedLunch() {
       emitBeep();
   } else if (arduboy.justPressed(UP_BUTTON)) {
       selectedLunch = (selectedLunch == HAMBURGER) ? NO_LUNCH - 1 : selectedLunch - 1;
+      emitBeep();
+  }
+}
+
+// Function to navigate between the selected status options
+void navigateSelectedStatus() {
+  if(currentMenu != STATUS) {
+    return;
+  }
+  if (arduboy.justPressed(DOWN_BUTTON)) {
+      selectedStatus = (selectedStatus == NO_STATUS - 1) ? HAPPINESS : selectedStatus + 1;
+      emitBeep();
+  } else if (arduboy.justPressed(UP_BUTTON)) {
+      selectedStatus = (selectedStatus == HAPPINESS) ? NO_STATUS - 1 : selectedStatus - 1;
       emitBeep();
   }
 }
