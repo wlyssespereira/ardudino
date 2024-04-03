@@ -5,10 +5,11 @@
 
 Arduboy2 arduboy;
 
-Menu currentMenu = DRINK;
-SelectedSwitch selectedSwitch = MENU_TURN_ON;
-HumorCreature humorCreature = NONE;
-SelectedLunch selectedLunch = HAMBURGER;
+Menu               currentMenu        = DRINK;
+SelectedSwitch     selectedSwitch     = MENU_TURN_ON;
+HumorCreature      humorCreature      = NONE;
+SelectedLunch      selectedLunch      = HAMBURGER;
+CreatureMenuStatus creatureMenuStatus = HAPPINESS;
 
 // Array associating the menu enum with the corresponding sprite
 const uint8_t* menuSprites[] = {
@@ -24,37 +25,38 @@ const uint8_t* menuSprites[] = {
   firstAidKitSprite,     // HEAL
 };
 
-const uint8_t spriteWidth = 8;   // Width of the sprite
-const uint8_t spriteHeight = 8;  // Height of the sprite
-const uint8_t creatureFrameDuration = 10;  // Duration of each frame in update frames
-const unsigned long frameDuration = 1000;  // One second
-const unsigned long humorDuration = 10000;
+const uint8_t spriteWidth           = 8;            // Width of the sprite
+const uint8_t spriteHeight          = 8;            // Height of the sprite
+const uint8_t creatureFrameDuration = 10;           // Duration of each frame in update frames
+const unsigned long frameDuration   = 1000;         // One second
+const unsigned long humorDuration   = 10000;
 
 // Calculate the x and y coordinates to center the sprite on the screen
-uint8_t spriteX = (arduboy.width() - spriteWidth) / 2;
-uint8_t spriteY = (arduboy.height() - spriteHeight) / 2;
+uint8_t spriteX                    = (arduboy.width() - spriteWidth) / 2;
+uint8_t spriteY                    = (arduboy.height() - spriteHeight) / 2;
 
-uint8_t creatureCurrentFrame = 0;          // Index of the current frame
-uint8_t currentFrame = 0;
-unsigned long lastFrameTime = 0;
+uint8_t creatureCurrentFrame       = 0;            // Index of the current frame
+uint8_t currentFrame               = 0;
+unsigned long lastFrameTime        = 0;
 unsigned long previousTime;
 
 // Creature status
-uint8_t happiness;
-uint8_t education;
-uint8_t weight;
-uint8_t age;
-uint8_t hunger;
-uint8_t thirst;
-uint8_t temperature;
+uint8_t happiness       = 0;  // Sprite
+uint8_t education       = 0;  // Sprite
+uint8_t hunger          = 2;  // Sprite
+uint8_t thirst          = 0;  // Sprite
+uint8_t weight          = 1;  // Text
+uint8_t age             = 0;  // Text
+uint8_t temperature     = 25; // Text
 
-bool isStartScreen = true;
-bool isControlsBlocked = false;
-bool isMenuSelected = false;
-bool isLightOn = true;
-bool isDoingCaress = false;
-bool isDrinkingWater = false;
-bool isInFoodMenu = false;
+bool isStartScreen      = true;
+bool isControlsBlocked  = false;
+bool isMenuSelected     = false;
+bool isLightOn          = true;
+bool isDoingCaress      = false;
+bool isDrinkingWater    = false;
+bool isInFoodMenu       = false;
+
 
 void setup() {
   arduboy.begin();
@@ -217,9 +219,27 @@ void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t r
       humorCreature = POSITIVE;
       isControlsBlocked = true;
       break;
+    case STATUS:
+      drawStatusMenu(rectX, rectY);
+      break;
     default:
       return;
   }
+}
+
+// Function to draw the status menu
+void drawStatusMenu(uint8_t x, uint8_t y) {
+  // Adjust the position to draw the sprite
+  x += 30;
+  y += 15;
+
+  uint8_t creatPosArr[4][2];
+  buildCreatPosArr(x, y, creatPosArr);
+
+  for (uint8_t i = 0; i < 4; i++) {
+    drawCustomBitmap(creatPosArr[i] , foodSprites[selectedLunch][i], 10, 10);
+  }
+
 }
 
 // Function to draw the food menu

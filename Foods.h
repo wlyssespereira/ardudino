@@ -13,7 +13,7 @@ enum SelectedLunch {
 
 // https://xantorohara.github.io/led-matrix-editor/
 
-const PROGMEM uint8_t foodSprites[6][4][10] = {
+const PROGMEM uint8_t foodSprites[][4][10] = {
   // HAMBURGER
   { { 8, 8,
       0b00000000,

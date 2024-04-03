@@ -170,7 +170,7 @@ const PROGMEM uint8_t firstAidKitSprite[] = {
 };
 
 
-const PROGMEM uint8_t startScreenSprites[4][4][10] = {
+const PROGMEM uint8_t startScreenSprites[][4][10] = {
   {
     { 8,
       8,
