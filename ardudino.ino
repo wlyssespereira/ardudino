@@ -10,7 +10,7 @@ SelectedSwitch selectedSwitch = MENU_TURN_ON;
 HumorCreature humorCreature = NONE;
 SelectedLunch selectedLunch = HAMBURGER;
 
-// Array que relaciona o enum do menu com o sprite correspondente
+// Array associating the menu enum with the corresponding sprite
 const uint8_t* menuSprites[] = {
   juiceSprite,           // DRINK
   hamburgerSprite,       // FOOD
@@ -24,22 +24,29 @@ const uint8_t* menuSprites[] = {
   firstAidKitSprite,     // HEAL
 };
 
-const uint8_t spriteWidth = 8;   // Largura do sprite
-const uint8_t spriteHeight = 8;  // Altura do sprite
+const uint8_t spriteWidth = 8;   // Width of the sprite
+const uint8_t spriteHeight = 8;  // Height of the sprite
+const uint8_t creatureFrameDuration = 10;  // Duration of each frame in update frames
+const unsigned long frameDuration = 1000;  // One second
+const unsigned long humorDuration = 10000;
 
-// Calcula as coordenadas x e y para centralizar o sprite na tela
+// Calculate the x and y coordinates to center the sprite on the screen
 uint8_t spriteX = (arduboy.width() - spriteWidth) / 2;
 uint8_t spriteY = (arduboy.height() - spriteHeight) / 2;
 
-// Variáveis para a animação da criatura
-uint8_t creatureCurrentFrame = 0;          // Índice do frame atual
-const uint8_t creatureFrameDuration = 10;  // Duração de cada frame em frames de atualização
+uint8_t creatureCurrentFrame = 0;          // Index of the current frame
 uint8_t currentFrame = 0;
 unsigned long lastFrameTime = 0;
-const unsigned long frameDuration = 1000;  // Um segundo
-const unsigned long humorDuration = 10000;
-
 unsigned long previousTime;
+
+// Creature status
+uint8_t happiness;
+uint8_t education;
+uint8_t weight;
+uint8_t age;
+uint8_t hunger;
+uint8_t thirst;
+uint8_t temperature;
 
 bool isStartScreen = true;
 bool isControlsBlocked = false;
@@ -52,7 +59,7 @@ bool isInFoodMenu = false;
 void setup() {
   arduboy.begin();
   arduboy.setFrameRate(15);
-  previousTime = millis(); // Inicializa o tempo anterior
+  previousTime = millis(); // Initialize the previous time
 }
 
 void loop() {
@@ -68,54 +75,54 @@ void loop() {
     arduboy.setCursor(60, 40);
     arduboy.print(F("Press A..."));
     arduboy.display();
-    // Aguarda até que o botão B seja pressionado
+    // Wait until the B button is pressed
     if (arduboy.pressed(A_BUTTON)) {
       isStartScreen = false;
     }
     return;
   }
 
-  // Limpa a tela
+  // Clear the screen
   arduboy.clear();
 
-  //Desenha os menus
+  //Draw the menus
   drawLateralMenus();
 
-  // Calcula a posição central vertical entre os ícones do menu à esquerda
+  // Calculate the vertical center position between the left menu icons
   uint8_t centerY = iconYOffset + (numIconsLeft * iconSpacing) / 2;
 
-  // Calcula a largura e altura do retângulo central
+  // Calculate the width and height of the central rectangle
   uint8_t rectWidth = (iconXRight - iconXLeft - 10) * 0.8;
   uint8_t rectHeight = (numIconsLeft * iconSpacing - 6) * 0.9;
 
-  // Desenha a borda do retângulo central
+  // Draw the border of the central rectangle
   arduboy.drawRect(iconXLeft + 15, centerY - rectHeight / 2 + 3, rectWidth + 10, rectHeight, WHITE);
 
-  // Desenha o nome do menu selecionado
+  // Draw the name of the selected menu
   arduboy.setCursor(iconXLeft + 42, centerY - rectHeight / 2 - 4);
   arduboy.print(menuNames[currentMenu]);
 
-  // Desenha um quadrado dentro do retângulo central
+  // Draw a square inside the central rectangle
   if (isMenuSelected) {
     drawSelectedMenu(iconXLeft + 15, centerY - rectHeight / 2 + 3, rectWidth + 10, rectHeight);
     navigateLightSwitches();
     navigateSelectedLunch();
   }
 
-  // Função de execução dos controles.
+  // Execute the controls function
   executeControls();
 
-  // Desenha a criatura no centro do retângulo central
+  // Draw the creature in the center of the central rectangle
   drawCreature(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
-  // Desenha os status da criatura
+  // Draw the creature's status
   drawHumorCreature(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
-  // Desenha uma acao com a criatura
+  // Draw an action with the creature
   drawDoCaress(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
   drawDrinkWater(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
-  // Atualiza a animação da criatura
+  // Update the creature's animation
   unsigned long currentTime = millis();
   if (arduboy.everyXFrames(creatureFrameDuration)) {
     if (currentTime - lastFrameTime >= frameDuration) {
@@ -125,19 +132,19 @@ void loop() {
     }
   }
 
-  // Verifica se passaram-se 3 segundos desde a última mudança de estado e reseta o humor.
+  // Check if 3 seconds have passed since the last state change and reset the mood.
   resetHumor(currentTime);
 
   arduboy.display();
 }
 
-
+// Function to execute the controls.
 void executeControls() {
   if(isControlsBlocked) {
     return;
   }
 
-  // Verifica se o botão esquerdo foi pressionado para navegar entre os menus da esquerda
+  // Check if the left button was pressed to navigate between the left menus
   if (arduboy.justPressed(LEFT_BUTTON) && !isMenuSelected) {
     if (currentMenu >= (numMenus / 2)) {
       currentMenu = DRINK - 1;
@@ -146,7 +153,7 @@ void executeControls() {
     emitBeep();
   }
 
-  // Verifica se o botão direito foi pressionado para navegar entre os menus da direita
+  // Check if the right button was pressed to navigate between the right menus
   if (arduboy.justPressed(RIGHT_BUTTON) && !isMenuSelected) {
     if (currentMenu < (numMenus / 2)) {
       currentMenu = PLAY - 1;
@@ -164,30 +171,33 @@ void executeControls() {
   }
 }
 
-
+// Function to reset the mood after a certain duration
 void resetHumor(long currentTime) {
   if (currentTime - previousTime >= humorDuration) {
-    // Alterna o estado da variável
+    // Toggle the variable state
     humorCreature = NONE;
-    // Atualiza o tempo anterior para o tempo atual
+    // Update the previous time to the current time
     previousTime = currentTime;
-    // Carinho ja feito.
+    // Caress already done.
     isDoingCaress = false;
-    // Bebeu agua
-    isDrinkingWater = false;
-    // Desbloqueia os controles.
+    // Drank water
+    isDrinkingWater =
+
+ false;
+    // Unblock controls.
     isControlsBlocked = false;
   }
 }
 
+// Function to draw the lateral menus
 void drawLateralMenus() {
-  // Desenha os ícones do menu à esquerda
+  // Draw the left menu icons
   drawMenuIcons(iconXLeft, numIconsLeft, 0);
-  // Desenha os ícones do menu à direita
+  // Draw the right menu icons
   drawMenuIcons(iconXRight, numIconsRight, numIconsLeft);
 }
 
-// Função para desenhar o menu selecionado
+// Function to draw the selected menu
 void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
   switch (currentMenu) {
     case DRINK:
@@ -212,8 +222,9 @@ void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t r
   }
 }
 
+// Function to draw the food menu
 void drawFoodMenu(uint8_t x, uint8_t y) {
-  // Ajuste da posição para desenhar o sprite
+  // Adjust the position to draw the sprite
   x += 30;
   y += 15;
 
@@ -223,28 +234,27 @@ void drawFoodMenu(uint8_t x, uint8_t y) {
   for (uint8_t i = 0; i < 4; i++) {
     drawCustomBitmap(creatPosArr[i] , foodSprites[selectedLunch][i], 10, 10);
   }
-
 }
 
-// Função para desenhar os menus "Turn On" e "Turn Off" dentro do quadrado
+// Function to draw the light menu
 void drawLightMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
-  // Define as coordenadas dos menus de texto
+  // Define the coordinates of the text menus
   uint8_t menuX1 = rectX + 10;
   uint8_t menuX2 = rectX + 10;
-  uint8_t menuY1 = rectY + rectHeight / 2 - 10;  // Ajusta a altura verticalmente para o primeiro menu
-  uint8_t menuY2 = menuY1 + 20;                  // Define a posição vertical do segundo menu abaixo do primeiro
+  uint8_t menuY1 = rectY + rectHeight / 2 - 10;  // Adjust the vertical height for the first menu
+  uint8_t menuY2 = menuY1 + 20;                  // Set the vertical position of the second menu below the first
 
-  // Desenha os menus de texto
+  // Draw the text menus
   arduboy.setCursor(menuX1, menuY1);
   arduboy.print(F("Turn On"));
   if(selectedSwitch == MENU_TURN_ON) {
-    arduboy.drawRect(menuX1 - 2, menuY1 - 2, arduboy.getCharacterWidth() * 7 + 10, 12 + 4, WHITE);  // Desenha a borda em volta do menu "Turn On"
+    arduboy.drawRect(menuX1 - 2, menuY1 - 2, arduboy.getCharacterWidth() * 7 + 10, 12 + 4, WHITE);  // Draw the border around the "Turn On" menu
   }
 
   arduboy.setCursor(menuX2, menuY2);
   arduboy.print(F("Turn Off"));
   if(selectedSwitch == MENU_TURN_OFF) { 
-    arduboy.drawRect(menuX2 - 2, menuY2 - 2, arduboy.getCharacterWidth() * 8 + 12, 12 + 2, WHITE);  // Desenha a borda em volta do menu "Turn Off"
+    arduboy.drawRect(menuX2 - 2, menuY2 - 2, arduboy.getCharacterWidth() * 8 + 12, 12 + 2, WHITE);  // Draw the border around the "Turn Off" menu
   }
 
   if(arduboy.justPressed(B_BUTTON)) {
@@ -261,6 +271,7 @@ void drawLightMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rect
   }
 }
 
+// Function to navigate between the selected lunch options
 void navigateSelectedLunch() {
   if(currentMenu != FOOD) {
     return;
@@ -274,7 +285,7 @@ void navigateSelectedLunch() {
   }
 }
 
-// Função para navegar entre os menus "Turn On" e "Turn Off"
+// Function to navigate between the light menus
 void navigateLightSwitches() {
     if(currentMenu != LIGHT) {
       return;
@@ -288,7 +299,7 @@ void navigateLightSwitches() {
     }
 }
 
-// Função para navegar entre os lanches
+// Function to navigate between the lunch options
 void navigateLunches() {
     if(currentMenu != LIGHT) {
       return;
@@ -302,15 +313,15 @@ void navigateLunches() {
     }
 }
 
-// Função para desenhar os menus "Turn On" e "Turn Off" dentro do quadrado
+// Function to draw the text menus
 void drawTextMenus(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
-  // Define as coordenadas dos menus de texto
+  // Define the coordinates of the text menus
   uint8_t menuX1 = rectX + 10;
   uint8_t menuX2 = rectX + 10;
-  uint8_t menuY1 = rectY + rectHeight / 2 - 10;  // Ajusta a altura verticalmente para o primeiro menu
-  uint8_t menuY2 = menuY1 + 12;                  // Define a posição vertical do segundo menu abaixo do primeiro
+  uint8_t menuY1 = rectY + rectHeight / 2 - 10;  // Adjust the vertical height for the first menu
+  uint8_t menuY2 = menuY1 + 12;                  // Set the vertical position of the second menu below the first
 
-  // Desenha os menus de texto
+  // Draw the text menus
   arduboy.setCursor(menuX1, menuY1);
   arduboy.print(F("Turn On"));
 
@@ -319,11 +330,11 @@ void drawTextMenus(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rect
 }
 
 
-// Função para desenhar a tela inicial.
+// Function to draw the start screen.
 void drawStartScreen(uint8_t x, uint8_t y) {
   uint8_t startScrSprSize = 4;
 
-  // Ajuste da posição para desenhar o sprite
+  // Adjust the position to draw the sprite
   x -= 30;
   y -= 10;
 
@@ -338,17 +349,19 @@ void drawStartScreen(uint8_t x, uint8_t y) {
   }
 }
 
-// Função para desenhar o bichinho
+// Function to draw the creature
 void drawCreature(uint8_t x, uint8_t y) {
   if (isMenuSelected) {
     return;
   }
 
-  // Ajuste da posição para desenhar o sprite
+  // Adjust the position to draw the sprite
   x -= 10;
   y -= 10;
 
   uint8_t creatPosArr[4][2];
+
+
   buildCreatPosArr(x, y, creatPosArr);
 
   for (uint8_t i = 0; i < 4; i++) {
@@ -361,7 +374,7 @@ void drawHumorCreature(uint8_t x, uint8_t y) {
     return;
   }
 
-  // Ajuste da posição para desenhar o sprite
+  // Adjust the position to draw the sprite
   x += 15;
   y -= 10;
 
@@ -379,7 +392,7 @@ void drawDoCaress(uint8_t x, uint8_t y) {
     return;
   }
 
-  // Ajuste da posição para desenhar o sprite
+  // Adjust the position to draw the sprite
   x -= 25;
   y -= 10 + creatureCurrentFrame;
 
@@ -400,7 +413,7 @@ void drawDrinkWater(uint8_t x, uint8_t y) {
     return;
   }
 
-  // Ajuste da posição para desenhar o sprite
+  // Adjust the position to draw the sprite
   x -= 30;
   y -= 10 + creatureCurrentFrame;
 
@@ -425,39 +438,39 @@ void buildCreatPosArr(uint8_t x, uint8_t y, uint8_t creatPosArr[][2]) {
     creatPosArr[3][1] = y + 8;
 }
 
-// Função para atualizar a animação da criatura
+// Function to update the creature's animation
 void updateCreatureAnimation() {
   if (isMenuSelected) {
     return;
   }
 
-  // Incrementa o contador do frame atual
+  // Increment the current frame counter
   creatureCurrentFrame++;
 
-  // Verifica se é hora de mudar para o próximo frame
+  // Check if it's time to switch to the next frame
   if (creatureCurrentFrame >= creatureNumFrames) {
-    creatureCurrentFrame = 0;  // Reinicia a animação
+    creatureCurrentFrame = 0;  // Restart the animation
   }
 }
 
-// Função para emitir um bip
+// Function to emit a beep
 void emitBeep() {
-  // Liga o alto-falante por um curto período para produzir um bip
-  tone(5, 1000, 50);  // Toca um som de 1000Hz por 50ms
-  delay(10);          // Pequeno atraso para garantir que o bip termine completamente
+  // Turn on the speaker for a short period to produce a beep
+  tone(5, 1000, 50);  // Play a 1000Hz sound for 50ms
+  delay(10);          // Small delay to ensure the beep completes fully
 }
 
-// Função para desenhar os ícones do menu
+// Function to draw the menu icons
 void drawMenuIcons(uint8_t x, uint8_t numIcons, uint8_t startMenu) {
   for (uint8_t i = 0; i < numIcons; i++) {
     Menu menu = static_cast<Menu>(startMenu + i);
 
-    // Desenha o contorno ao redor do ícone selecionado
+    // Draw the outline around the selected icon
     if (currentMenu == menu) {
       arduboy.drawRect(x, iconYOffset + i * iconSpacing - 2, iconWidth + 4, iconHeight + 4, WHITE);
     }
 
-    // Desenha os ícones
+    // Draw the icons
     arduboy.setCursor(x + 4, iconYOffset + i * iconSpacing + 4);
     drawCustomBitmap(x, iconYOffset + i * iconSpacing, menuSprites[menu], iconWidth, iconHeight);
   }
@@ -467,12 +480,12 @@ void drawCustomBitmap(const uint8_t* posXaY, const uint8_t* sprite, uint8_t widt
   drawCustomBitmap(posXaY[0], posXaY[1], sprite, width, height);
 }
 
-// Função para desenhar um sprite na tela, permitindo ajustes nas colunas
+// Function to draw a sprite on the screen, allowing adjustments in the columns
 void drawCustomBitmap(uint8_t x, uint8_t y, const uint8_t* sprite, uint8_t width, uint8_t height) {
   uint8_t color = WHITE;
   for (uint8_t row = 0; row < height; row++) {
     for (uint8_t col = 0; col < width; col++) {
-      // Verificar se o bit correspondente está definido no sprite
+      // Check if the corresponding bit is set in the sprite
       if (pgm_read_byte_near(sprite + row) & (1 << (width - col - 1))) {
         if (row < 2) {
           color = BLACK;
