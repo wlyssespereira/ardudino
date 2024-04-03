@@ -1,7 +1,7 @@
 #ifndef CREATURE_H
 #define CREATURE_H
 
-// Constantes para a animação da criatura
+// Constants for creature animation
 const uint8_t creatureSpriteWidth = 16;   // Largura do sprite
 const uint8_t creatureSpriteHeight = 16;  // Altura do sprite
 const uint8_t creatureNumFrames = 3;      // Número de frames na animação

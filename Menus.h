@@ -1,11 +1,9 @@
-// Menus.h
-
 #ifndef MENUS_H
 #define MENUS_H
 
 #include <Arduboy2.h>
 
-// Constantes relacionadas aos ícones do menu
+// Constants related to menu icons
 const uint8_t numIconsLeft = 5;
 const uint8_t numIconsRight = 5;
 const uint8_t iconWidth = 8;
@@ -16,13 +14,13 @@ const uint8_t iconXRight = 113;
 const uint8_t iconYOffset = 2;
 const uint8_t numMenus = 10;
 
-// Variáveis para o retângulo central
+// Variables for the central rectangle
 const uint8_t rectX = 30;
 const uint8_t rectY = 20;
 const uint8_t rectWidth = 68;
 const uint8_t rectHeight = 28;
 
-// Enumeração dos menus
+// Enumeration of menus
 enum Menu {
   DRINK,
   FOOD,
@@ -37,13 +35,13 @@ enum Menu {
   HEAL
 };
 
-// Enumeração para os menus selecionáveis
+// Enumeration for selectable menus
 enum SelectedSwitch {
   MENU_TURN_ON,
   MENU_TURN_OFF
 };
 
-// Declarando um array de strings para os nomes dos menus
+// Declaring an array of strings for the menu names
 const char* menuNames[] = {
   "Drink",    // Drink
   "Food",     // FOOD
@@ -57,9 +55,7 @@ const char* menuNames[] = {
   "Heal"      // HEAL
 };
 
-
 // https://xantorohara.github.io/led-matrix-editor/
-
 
 const PROGMEM uint8_t juiceSprite[] = {
   8,
