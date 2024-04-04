@@ -255,7 +255,7 @@ void drawStatusByIcons(uint8_t x, uint8_t y, uint8_t creatPosArr[][2]) {
       counter = happiness;
       break;
     case EDUCATION:
-      counter = happiness;
+      counter = education;
       break;
     case HUNGER:
       counter = hunger;
@@ -267,25 +267,21 @@ void drawStatusByIcons(uint8_t x, uint8_t y, uint8_t creatPosArr[][2]) {
       return;
   }
 
-  x += 20;
-  y += 10;
-  buildCreatPosArr(x, y, creatPosArr);
-  drawStatusSprites(creatPosArr);
+  x += 20; y += 10;
+  drawStatusIconByCount(x, y, creatPosArr, counter, 0);
+  x += 30; y += 0;
+  drawStatusIconByCount(x, y, creatPosArr, counter, 1);
+  x -= 30; y += 15;
+  drawStatusIconByCount(x, y, creatPosArr, counter, 2);
+  x += 30; y += 0;
+  drawStatusIconByCount(x, y, creatPosArr, counter, 3);
+}
 
-  x += 30;
-  y += 0;
-  buildCreatPosArr(x, y, creatPosArr);
-  drawStatusSprites(creatPosArr);
-
-  x -= 30;
-  y += 15;
-  buildCreatPosArr(x, y, creatPosArr);
-  drawStatusSprites(creatPosArr);
-
-  x += 30;
-  y += 0;
-  buildCreatPosArr(x, y, creatPosArr);
-  drawStatusSprites(creatPosArr);
+void drawStatusIconByCount(uint8_t x, uint8_t y, uint8_t creatPosArr[][2], uint8_t counter, uint8_t value) {
+  if(counter > value) {
+    buildCreatPosArr(x, y, creatPosArr);
+    drawStatusSprites(creatPosArr);
+  }
 }
 
 // Function to draw creature sprites
