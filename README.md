@@ -13,7 +13,9 @@ The rules are pretty simple.
   
 * In game:
   * Menu "Drink":
-  *   <img src="/assets/menu_drink_water.png" data-canonical-src="/assets/menu_drink_water.png" width="300" height="200" />
+  
+  <img src="/assets/menu_drink_water.png" data-canonical-src="/assets/menu_drink_water.png" width="300" height="200" />
+
     
   * Menu "Food":
     
