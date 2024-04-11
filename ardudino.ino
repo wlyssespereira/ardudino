@@ -184,9 +184,7 @@ void resetHumor(long currentTime) {
     // Caress already done.
     isDoingCaress = false;
     // Drank water
-    isDrinkingWater =
-
- false;
+    isDrinkingWater = false;
     // Unblock controls.
     isControlsBlocked = false;
   }
@@ -237,7 +235,7 @@ void drawStatusMenu(uint8_t x, uint8_t y) {
   arduboy.setCursor(x + 5, y + 2);
   arduboy.print(statusNames[selectedStatus]);
 
-  if(selectedStatus < THIRST) {
+  if(selectedStatus < WEIGHT) {
     drawStatusByIcons(x, y, creatPosArr);
   } else {
     drawStatusByText(x, y);
@@ -245,7 +243,22 @@ void drawStatusMenu(uint8_t x, uint8_t y) {
 }
 
 void drawStatusByText(uint8_t x, uint8_t y) {
-
+  char text[10];
+  switch (selectedStatus) {
+      case WEIGHT:
+        sprintf(text, "%d Kg", weight);
+        break;
+      case AGE:
+        sprintf(text, "%d Days", age);
+        break;
+      case TEMPERATURE:
+        sprintf(text, "%d %cC", temperature, (char)167);
+        break;
+      default:
+        return;
+  }
+  arduboy.setCursor(x + 30, y + 20);
+  arduboy.print(text);
 }
 
 void drawStatusByIcons(uint8_t x, uint8_t y, uint8_t creatPosArr[][2]) {
@@ -444,8 +457,6 @@ void drawCreature(uint8_t x, uint8_t y) {
   y -= 10;
 
   uint8_t creatPosArr[4][2];
-
-
   buildCreatPosArr(x, y, creatPosArr);
 
   for (uint8_t i = 0; i < 4; i++) {
