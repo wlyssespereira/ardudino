@@ -14,7 +14,7 @@ The rules are pretty simple.
 * In game:
   * Menu "Drink":
   
-  <img src="/assets/menu_drink_water.png" data-canonical-src="/assets/menu_drink_water.png" width="300" height="200" />
+      <img src="/assets/menu_drink_water.png" data-canonical-src="/assets/menu_drink_water.png" width="300" height="200" />
 
     
   * Menu "Food":
@@ -23,7 +23,7 @@ The rules are pretty simple.
 
      * Options in menu food:
 
-     <img src="/assets/menu_food_options.png" data-canonical-src="/assets/menu_food_options.png" width="300" height="200" />
+     <img src="/assets/menu_food_options.png" data-canonical-src="/assets/menu_food_options.png" width="300" height="1200" />
 
     
   * Menu "Light":
