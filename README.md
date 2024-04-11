@@ -19,6 +19,13 @@ The rules are pretty simple.
     
   * Menu "Food":
     
+     <img src="/assets/menu_food.png" data-canonical-src="/assets/menu_food.png" width="300" height="200" />
+
+     * Options in menu food:
+
+     <img src="/assets/menu_food_options.png" data-canonical-src="/assets/menu_food_options.png" width="300" height="200" />
+
+    
   * Menu "Light":
     
   * Menu "Caress": 
