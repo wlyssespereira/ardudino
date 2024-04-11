@@ -8,7 +8,7 @@ An Arduboy game that simulates a virtual pet
 The rules are pretty simple.
 
 * Start Screen:
-  <img src="/assets/start_screen.png" data-canonical-src="/assets/start_screen.png" width="600" height="200" />
+  <img src="/assets/start_screen.png" data-canonical-src="/assets/start_screen.png" width="300" height="200" />
   
 * In game:
   * Menu "Drink":
