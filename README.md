@@ -23,7 +23,7 @@ The rules are pretty simple.
 
      * Options in menu food:
 
-     <img src="/assets/menu_food_options.png" data-canonical-src="/assets/menu_food_options.png" width="200" height="400" />
+     <img src="/assets/menu_food_options.png" data-canonical-src="/assets/menu_food_options.png" width="150" height="350" />
 
     
   * Menu "Light":
