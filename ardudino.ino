@@ -202,9 +202,7 @@ void drawLateralMenus() {
 void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
   switch (currentMenu) {
     case DRINK:
-      previousTime = millis();
-      isDrinkingWater = true;
-      isControlsBlocked = true;
+      doDrinkingWater();
       break;
     case FOOD:
       drawFoodMenu(rectX, rectY);
@@ -213,16 +211,34 @@ void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t r
       drawLightMenu(rectX, rectY, rectWidth, rectHeight);
       break;
     case CARESS:
-      previousTime = millis();
-      isDoingCaress = true;
-      humorCreature = POSITIVE;
-      isControlsBlocked = true;
+      doCaress();
       break;
     case STATUS:
       drawStatusMenu(rectX, rectY);
       break;
     default:
       return;
+  }
+}
+
+void doCaress() {
+  previousTime = millis();
+  isControlsBlocked = true;
+
+  isDoingCaress = true;
+  humorCreature = POSITIVE;
+}
+
+void doDrinkingWater() {
+  previousTime = millis();
+  isControlsBlocked = true;
+
+  if(thirst < 4) {
+    isDrinkingWater = true;
+    thirst++;
+  } else {
+    humorCreature = NEGATIVE;
+    isMenuSelected = false;
   }
 }
 
@@ -479,7 +495,6 @@ void drawHumorCreature(uint8_t x, uint8_t y) {
   for (uint8_t i = 0; i < 4; i++) {
     drawCustomBitmap(creatPosArr[i] , humorIcons[humorCreature][i], 10, 10);
   }
-
 }
 
 void drawDoCaress(uint8_t x, uint8_t y) {
@@ -500,7 +515,6 @@ void drawDoCaress(uint8_t x, uint8_t y) {
 
   humorCreature = POSITIVE;
   isMenuSelected = false;
-
 }
 
 void drawDrinkWater(uint8_t x, uint8_t y) {
