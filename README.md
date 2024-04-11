@@ -1,5 +1,5 @@
 # Ardudino
-<img src="/assets/banner10.png" data-canonical-src="/assets/banner10.png" width="2600" height="200" />
+<img src="/assets/banner.png" data-canonical-src="/assets/banner.png" width="2600" height="200" />
 
 An Arduboy game that simulates a virtual pet
 
@@ -9,7 +9,7 @@ The rules are pretty simple.
 
 * Start Screen:
   
-  <img src="/assets/start_screen.png" data-canonical-src="/assets/start_screen.png" width="300" height="200" />
+  <img src="/assets/start_screen1.png" data-canonical-src="/assets/start_screen1.png" width="300" height="200" />
   
 * In game:
   * Menu "Drink":
