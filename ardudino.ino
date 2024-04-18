@@ -2,6 +2,7 @@
 #include "Menus.h"
 #include "Creature.h"
 #include "Foods.h"
+#include "Play.h"
 
 Arduboy2 arduboy;
 
@@ -10,6 +11,8 @@ SelectedSwitch     selectedSwitch     = MENU_TURN_ON;
 HumorCreature      humorCreature      = NONE;
 SelectedLunch      selectedLunch      = HAMBURGER;
 SelectedStatus     selectedStatus     = HAPPINESS;
+SelectedPlay       selectedPlay       = ROCK;
+SelectedPlay       selectedDinoPlay   = NONE_PLAY;
 
 // Array associating the menu enum with the corresponding sprite
 const uint8_t* menuSprites[] = {
@@ -110,6 +113,7 @@ void loop() {
     navigateLightSwitches();
     navigateSelectedLunch();
     navigateSelectedStatus();
+    navigateSelectedPlay();
   }
 
   // Execute the controls function
@@ -216,6 +220,8 @@ void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t r
     case STATUS:
       drawStatusMenu(rectX, rectY);
       break;
+    case PLAY:
+      drawPlayMenu(rectX, rectY);
     default:
       return;
   }
@@ -320,6 +326,35 @@ void drawStatusSprites(uint8_t creatPosArr[][2]) {
   }
 }
 
+// Function to draw the play menu
+void drawPlayMenu(uint8_t x, uint8_t y) {
+  // Adjust the position to draw the sprite
+  x += 20;
+  y += 20;
+
+  arduboy.setCursor(x, y - 10);
+  arduboy.print(F("You"));
+
+  arduboy.setCursor(x + 30, y - 10);
+  arduboy.print(F("Dino"));
+
+  uint8_t creatPosArr[4][2];
+  buildCreatPosArr(x, y, creatPosArr);
+
+  for (uint8_t i = 0; i < 4; i++) {
+    drawCustomBitmap(creatPosArr[i] , playSprites[selectedPlay][i], 10, 10);
+  }
+
+  if(selectedDinoPlay != NONE_PLAY) {
+    x += 30;
+    buildCreatPosArr(x, y, creatPosArr);
+    for (uint8_t i = 0; i < 4; i++) {
+      drawCustomBitmap(creatPosArr[i] , playSprites[selectedDinoPlay][i], 10, 10);
+    }
+  }
+
+
+}
 
 // Function to draw the food menu
 void drawFoodMenu(uint8_t x, uint8_t y) {
@@ -380,6 +415,19 @@ void navigateSelectedLunch() {
       emitBeep();
   } else if (arduboy.justPressed(UP_BUTTON)) {
       selectedLunch = (selectedLunch == HAMBURGER) ? NO_LUNCH - 1 : selectedLunch - 1;
+      emitBeep();
+  }
+}
+
+void navigateSelectedPlay() {
+  if(currentMenu != PLAY) {
+    return;
+  }
+  if (arduboy.justPressed(DOWN_BUTTON)) {
+      selectedPlay = (selectedPlay == SCISSORS) ? ROCK : selectedPlay + 1;
+      emitBeep();
+  } else if (arduboy.justPressed(UP_BUTTON)) {
+      selectedPlay = (selectedPlay == ROCK) ? SCISSORS : selectedPlay - 1;
       emitBeep();
   }
 }

@@ -1,8 +1,6 @@
 #ifndef MENUS_H
 #define MENUS_H
 
-#include <Arduboy2.h>
-
 // Constants related to menu icons
 const uint8_t numIconsLeft = 5;
 const uint8_t numIconsRight = 5;
