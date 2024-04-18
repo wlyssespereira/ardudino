@@ -14,10 +14,17 @@ The rules are pretty simple.
 * In game:
   * Menu "Drink":
   
-  <img src="/assets/menu_drink_water.png" data-canonical-src="/assets/menu_drink_water.png" width="300" height="200" />
+      <img src="/assets/menu_drink_water.png" data-canonical-src="/assets/menu_drink_water.png" width="300" height="200" />
 
     
   * Menu "Food":
+    
+     <img src="/assets/menu_food.png" data-canonical-src="/assets/menu_food.png" width="300" height="200" />
+
+     * Options in menu food:
+
+         <img src="/assets/menu_food_options.png" data-canonical-src="/assets/menu_food_options.png" width="150" height="350" />
+
     
   * Menu "Light":
     
