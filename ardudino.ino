@@ -52,8 +52,11 @@ uint8_t weight          = 1;  // Text
 uint8_t age             = 0;  // Text
 uint8_t temperature     = 25; // Text
 
+uint16_t playMenuResult  = 0;
+
 bool isStartScreen      = true;
 bool isControlsBlocked  = false;
+bool isBackDinoBlocked  = false;
 bool isMenuSelected     = false;
 bool isLightOn          = true;
 bool isDoingCaress      = false;
@@ -173,7 +176,7 @@ void executeControls() {
     isMenuSelected = true;
   }
 
-  if (arduboy.justPressed(A_BUTTON)) {
+  if (arduboy.justPressed(A_BUTTON) && (isBackDinoBlocked == false)) {
     isMenuSelected = false;
   }
 }
@@ -330,7 +333,7 @@ void drawStatusSprites(uint8_t creatPosArr[][2]) {
 void drawPlayMenu(uint8_t x, uint8_t y) {
   // Adjust the position to draw the sprite
   x += 20;
-  y += 20;
+  y += 15;
 
   arduboy.setCursor(x, y - 10);
   arduboy.print(F("You"));
@@ -353,7 +356,75 @@ void drawPlayMenu(uint8_t x, uint8_t y) {
     }
   }
 
+  int16_t result;
+  if(arduboy.justPressed(B_BUTTON)) {
+    initPlayGame();
+    selectedDinoPlay = getDinoMove();
+    result = determineWinner(selectedPlay, selectedDinoPlay);
+    
 
+  }
+
+  x -= 10;
+  y += 20;
+  arduboy.setCursor(x, y);
+  arduboy.print(result);
+  switch (result) {
+    case 1:
+      arduboy.print('O');
+      break;
+    case -1:
+      arduboy.print('X');
+      break;
+    case 0:
+      arduboy.print('-');
+      break;
+    default:
+      arduboy.print('-');
+  }
+
+
+
+
+
+
+}
+
+void initPlayGame() {
+  if(isBackDinoBlocked == true) {
+    return;
+  }
+  playMenuResult = 0;
+  isBackDinoBlocked = true;
+}
+
+// Get a random move for dino play.
+SelectedPlay getDinoMove() {
+  return static_cast<SelectedPlay>(rand() % 3);
+}
+
+// Function to determine the winner of the Rock, Paper, Scissors game
+// Parameters:
+//   - selectedPlay: Move of the first player (of type Game)
+//   - selectedDinoPlay: Move of the second player (of type Game)
+// Return:
+//   - Returns 1 if the first player wins
+//   - Returns -1 if the second player wins
+//   - Returns 0 if there is a tie
+//   - Returns -2 in case of an unexpected error (value out of expected range)
+uint16_t determineWinner(SelectedPlay selectedPlay, SelectedPlay selectedDinoPlay) {
+  if (selectedPlay == selectedDinoPlay) {
+    return 0; // Draw
+  }
+  switch (selectedPlay) {
+    case ROCK:
+      return (selectedDinoPlay == SCISSORS) ? 1 : -1;
+    case PAPER:
+      return (selectedDinoPlay == ROCK) ? 1 : -1;
+    case SCISSORS:
+      return (selectedDinoPlay == PAPER) ? 1 : -1;
+  }
+  return -2; // Error
 }
 
 // Function to draw the food menu
