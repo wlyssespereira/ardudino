@@ -83,14 +83,12 @@ bool isStudying         = false;
 bool isShowering        = false;
 bool isHealing          = false;
 
-
 void setup() {
   arduboy.begin();
   arduboy.setFrameRate(15);
   randomSeed(millis());
   previousTime = millis();
 }
-
 
 void loop() {
   if (!arduboy.nextFrame()) {
@@ -207,7 +205,13 @@ void executeControls() {
     emitBeep();
   }
 
+  // B selects the current menu.
+  // When the light is OFF, only Status and Light menus can be opened.
   if (arduboy.justPressed(B_BUTTON)) {
+    if (!isLightOn && currentMenu != STATUS && currentMenu != LIGHT) {
+      emitBeep();
+      return;
+    }
     isMenuSelected = true;
   }
 
@@ -720,7 +724,6 @@ void drawClimateMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t re
 }
 
 // Heal menu: converts happiness loss from low stats into a small recovery.
-
 // Returns true if the creature is currently sick.
 // This is a lightweight rule-based check that relies on existing stats (no new persistent state).
 bool isCreatureSick() {
@@ -790,12 +793,6 @@ void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectH
     markStateDirty();
     isMenuSelected = false;
   }
-}
-
-void markStateDirty() {
-  // Stub: EEPROM persistence is not enabled in this branch yet.
-  // This function exists to keep patches compatible and will be replaced
-  // by a real "dirty flag" + autosave logic when persistence is implemented.
 }
 
 // Function to draw the light menu
@@ -933,7 +930,6 @@ void drawTextMenus(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rect
   arduboy.print(F("Turn Off"));
 }
 
-
 // Function to draw the start screen.
 void drawStartScreen(uint8_t x, uint8_t y) {
   uint8_t startScrSprSize = 4;
@@ -966,13 +962,23 @@ void drawCreature(uint8_t x, uint8_t y) {
   uint8_t creatPosArr[4][2];
   buildCreatPosArr(x, y, creatPosArr);
 
+  // When the light is OFF, show a simple sleeping animation instead of the regular creature frames.
+  if (!isLightOn) {
+    uint8_t sleepFrame = (millis() / 500) % 2;
+
+    for (uint8_t i = 0; i < 4; i++) {
+      drawCustomBitmapCreature(creatPosArr[i], sleepMatSprites[sleepFrame][i], 10, 10);
+    }
+    return;
+  }
+
   for (uint8_t i = 0; i < 4; i++) {
     drawCustomBitmapCreature(creatPosArr[i] , creatureMatSprites[creatureCurrentFrame][i], 10, 10);
   }
 }
 
 void drawHumorCreature(uint8_t x, uint8_t y) {
-  if (isMenuSelected || humorCreature == NONE) {
+  if (isMenuSelected || !isLightOn || humorCreature == NONE) {
     return;
   }
 
@@ -1026,7 +1032,6 @@ void drawDrinkWater(uint8_t x, uint8_t y) {
 
   isMenuSelected = false;
 }
-
 
 void drawDoStudy(uint8_t x, uint8_t y) {
   if(isStudying == false) {
@@ -1168,3 +1173,8 @@ void drawCustomBitmapCreature(const uint8_t* posXaY, const uint8_t* sprite, uint
   drawCustomBitmapCreature(posXaY[0], posXaY[1], sprite, width, height);
 }
 
+void markStateDirty() {
+  // Stub: EEPROM persistence is not enabled in this branch yet.
+  // This function exists to keep patches compatible and will be replaced
+  // by a real "dirty flag" + autosave logic when persistence is implemented.
+}
