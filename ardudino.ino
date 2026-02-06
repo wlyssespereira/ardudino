@@ -14,6 +14,14 @@ SelectedStatus     selectedStatus     = HAPPINESS;
 SelectedPlay       selectedPlay       = ROCK;
 SelectedPlay       selectedDinoPlay   = NONE_PLAY;
 
+// Climate selection inside the Climate menu.
+enum SelectedClimate {
+  CLIMATE_COOL,
+  CLIMATE_WARM
+};
+
+SelectedClimate selectedClimate = CLIMATE_COOL;
+
 // Array associating the menu enum with the corresponding sprite
 const uint8_t* menuSprites[] = {
   juiceSprite,           // DRINK
@@ -52,18 +60,28 @@ uint8_t weight          = 1;  // Text
 uint8_t age             = 0;  // Text
 uint8_t temperature     = 25; // Text
 
-uint16_t playMenuResult = 0;
-bool hasPlayResult      = false;
-int8_t lastPlayResult   = 0;
+// Rock / Paper / Scissors (Play) state.
+static const uint8_t kPlayTotalRounds = 5;
+bool playInProgress = false;
+bool playFinished   = false;
+uint8_t playRound   = 0;
+uint8_t playerWins  = 0;
+uint8_t dinoWins    = 0;
+int8_t lastPlayResult = 0;
 
 bool isStartScreen      = true;
 bool isControlsBlocked  = false;
-bool isBackDinoBlocked  = false;
+bool isBackDinoBlocked  = false; // Kept for backwards compatibility; no longer used by Play.
 bool isMenuSelected     = false;
 bool isLightOn          = true;
 bool isDoingCaress      = false;
 bool isDrinkingWater    = false;
 bool isInFoodMenu       = false;
+
+// One-shot action flags for menus that should not be repeated every frame.
+bool isStudying         = false;
+bool isShowering        = false;
+bool isHealing          = false;
 
 
 void setup() {
@@ -121,6 +139,7 @@ void loop() {
     navigateSelectedLunch();
     navigateSelectedStatus();
     navigateSelectedPlay();
+    navigateSelectedClimate();
   }
 
   // Execute the controls function
@@ -180,7 +199,9 @@ void executeControls() {
     isMenuSelected = true;
   }
 
-  if (arduboy.justPressed(A_BUTTON) && (isBackDinoBlocked == false)) {
+  // A is the global back/cancel.
+  // Exception: Play (RPS) must be finished once started.
+  if (arduboy.justPressed(A_BUTTON) && !(currentMenu == PLAY && (playInProgress || playFinished))) {
     isMenuSelected = false;
   }
 }
@@ -196,6 +217,12 @@ void resetHumor(long currentTime) {
     isDoingCaress = false;
     // Drank water
     isDrinkingWater = false;
+    // Study already done.
+    isStudying = false;
+    // Shower already done.
+    isShowering = false;
+    // Heal already done.
+    isHealing = false;
     // Unblock controls.
     isControlsBlocked = false;
   }
@@ -218,11 +245,20 @@ void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t r
     case CARESS:  doCaress();                                         break;
     case STATUS:  drawStatusMenu(rectX, rectY);                       break;
     case PLAY:    drawPlayMenu(rectX, rectY);                         break;
+    case STUDY:   drawStudyMenu(rectX, rectY, rectWidth, rectHeight); break;
+    case SHOWER:  drawShowerMenu(rectX, rectY, rectWidth, rectHeight);break;
+    case CLIMATE: drawClimateMenu(rectX, rectY, rectWidth, rectHeight);break;
+    case HEAL:    drawHealMenu(rectX, rectY, rectWidth, rectHeight);  break;
     default: return;
   }
 }
 
 void doCaress() {
+  // Caress should be applied once per selection, not every frame.
+  if (isDoingCaress) {
+    return;
+  }
+
   previousTime = millis();
   isControlsBlocked = true;
 
@@ -231,12 +267,18 @@ void doCaress() {
 }
 
 void doDrinkingWater() {
+  // Drinking should be applied once per selection, not every frame.
+  if (isDrinkingWater) {
+    return;
+  }
+
   previousTime = millis();
   isControlsBlocked = true;
 
   if(thirst < 4) {
     isDrinkingWater = true;
     thirst++;
+    humorCreature = POSITIVE;
   } else {
     humorCreature = NEGATIVE;
     isMenuSelected = false;
@@ -321,59 +363,125 @@ void drawStatusSprites(uint8_t creatPosArr[][2]) {
   }
 }
 
-// Function to draw the play menu
+// Function to draw the play menu (Rock / Paper / Scissors)
+// Rules:
+//   - Always 5 rounds
+//   - Once started, the player must finish (A is blocked)
+//   - B starts / advances rounds
+//   - After 5 rounds, B exits
 void drawPlayMenu(uint8_t x, uint8_t y) {
   // Adjust the position to draw the sprite
-  x += 20;
-  y += 15;
+  x += 10;
+  y += 6;
 
-  arduboy.setCursor(x, y - 10);
-  arduboy.print(F("You"));
-
-  arduboy.setCursor(x + 30, y - 10);
-  arduboy.print(F("Dino"));
-
-  uint8_t creatPosArr[4][2];
-  buildCreatPosArr(x, y, creatPosArr);
-
-  for (uint8_t i = 0; i < 4; i++) {
-    drawCustomBitmap(creatPosArr[i] , playSprites[selectedPlay][i], 10, 10);
+  // Header / round counter
+  arduboy.setCursor(x, y);
+  if (!playInProgress && !playFinished) {
+    arduboy.print(F("B Start"));
+  } else {
+    arduboy.print(F("Round "));
+    arduboy.print(playRound);
+    arduboy.print(F("/"));
+    arduboy.print(kPlayTotalRounds);
   }
 
-  if(selectedDinoPlay != NONE_PLAY) {
-    x += 30;
-    buildCreatPosArr(x, y, creatPosArr);
+  // Labels
+  arduboy.setCursor(x, y + 10);
+  arduboy.print(F("You"));
+  arduboy.setCursor(x + 44, y + 10);
+  arduboy.print(F("Dino"));
+
+  // Draw player move
+  uint8_t creatPosArr[4][2];
+  uint8_t px = x;
+  uint8_t py = y + 20;
+  buildCreatPosArr(px, py, creatPosArr);
+  for (uint8_t i = 0; i < 4; i++) {
+    drawCustomBitmap(creatPosArr[i], playSprites[selectedPlay][i], 10, 10);
+  }
+
+  // Draw dino move when available
+  if (selectedDinoPlay != NONE_PLAY) {
+    px = x + 44;
+    buildCreatPosArr(px, py, creatPosArr);
     for (uint8_t i = 0; i < 4; i++) {
-      drawCustomBitmap(creatPosArr[i] , playSprites[selectedDinoPlay][i], 10, 10);
+      drawCustomBitmap(creatPosArr[i], playSprites[selectedDinoPlay][i], 10, 10);
     }
   }
 
-  int16_t result;
+  // Scoreboard
+  arduboy.setCursor(x, y + 52);
+  arduboy.print(F("W "));
+  arduboy.print(playerWins);
+  arduboy.print(F("  L "));
+  arduboy.print(dinoWins);
+
+  // Input
   if (arduboy.justPressed(B_BUTTON)) {
-    initPlayGame();
-    selectedDinoPlay = getDinoMove();
-    lastPlayResult = determineWinner(selectedPlay, selectedDinoPlay);
-    hasPlayResult = true;
+    if (!playInProgress && !playFinished) {
+      startPlayIfNeeded();
+      advancePlayRound();
+    } else if (playInProgress) {
+      advancePlayRound();
+    } else if (playFinished) {
+      // Apply mood/result once when leaving.
+      if (dinoWins > playerWins) {
+        if (happiness < 4) happiness++;
+        humorCreature = POSITIVE;
+      } else if (playerWins > dinoWins) {
+        if (happiness > 0) happiness--;
+        humorCreature = NEGATIVE;
+      } else {
+        humorCreature = NONE;
+      }
 
-    // regra: dino feliz quando vence
-    if (lastPlayResult == -1 && happiness < 4) happiness++;
-    if (lastPlayResult ==  1 && happiness > 0) happiness--; // opcional: perder te deixa triste
+      // Reset play state and exit.
+      playInProgress = false;
+      playFinished = false;
+      playRound = 0;
+      playerWins = 0;
+      dinoWins = 0;
+      selectedDinoPlay = NONE_PLAY;
+      isMenuSelected = false;
+    }
   }
-
-  if (hasPlayResult) {
-    arduboy.setCursor(x, y);
-    arduboy.print(lastPlayResult);
-    // ... seu switch que imprime O/X/-
-  }
-
 }
 
-void initPlayGame() {
-  if(isBackDinoBlocked == true) {
+void startPlayIfNeeded() {
+  playInProgress = true;
+  playFinished = false;
+  playRound = 0;
+  playerWins = 0;
+  dinoWins = 0;
+  selectedDinoPlay = NONE_PLAY;
+}
+
+void advancePlayRound() {
+  if (!playInProgress) {
     return;
   }
-  playMenuResult = 0;
-  isBackDinoBlocked = true;
+
+  // Generate moves
+  selectedDinoPlay = getDinoMove();
+  lastPlayResult = determineWinner(selectedPlay, selectedDinoPlay);
+
+  // Update score
+  if (lastPlayResult == 1) {
+    playerWins++;
+  } else if (lastPlayResult == -1) {
+    dinoWins++;
+  }
+
+  // Advance round counter
+  if (playRound < kPlayTotalRounds) {
+    playRound++;
+  }
+
+  // Finish
+  if (playRound >= kPlayTotalRounds) {
+    playInProgress = false;
+    playFinished = true;
+  }
 }
 
 // Get a random move for dino play.
@@ -404,14 +512,230 @@ int8_t determineWinner(SelectedPlay selectedPlay, SelectedPlay selectedDinoPlay)
 // Function to draw the food menu
 void drawFoodMenu(uint8_t x, uint8_t y) {
   // Adjust the position to draw the sprite
-  x += 30;
-  y += 15;
+  x += 10;
+  y += 6;
+
+  // Title / hint
+  arduboy.setCursor(x, y);
+  arduboy.print(F("B Eat"));
+
+  // Food name
+  arduboy.setCursor(x, y + 10);
+  switch (selectedLunch) {
+    case HAMBURGER: arduboy.print(F("Hamburger")); break;
+    case MEAT:      arduboy.print(F("Meat")); break;
+    case VEGGIES:   arduboy.print(F("Veggies")); break;
+    case FRUIT:     arduboy.print(F("Fruit")); break;
+    case PASTA:     arduboy.print(F("Pasta")); break;
+    case ICECREAM:  arduboy.print(F("Ice Cream")); break;
+    default:        arduboy.print(F("Food")); break;
+  }
+
+  // Sprite
+  uint8_t sx = x + 20;
+  uint8_t sy = y + 22;
 
   uint8_t creatPosArr[4][2];
-  buildCreatPosArr(x, y, creatPosArr);
+  buildCreatPosArr(sx, sy, creatPosArr);
 
   for (uint8_t i = 0; i < 4; i++) {
     drawCustomBitmap(creatPosArr[i] , foodSprites[selectedLunch][i], 10, 10);
+  }
+
+  // Confirm
+  if (arduboy.justPressed(B_BUTTON)) {
+    applyFoodSelection();
+    isMenuSelected = false;
+  }
+}
+
+void applyFoodSelection() {
+  previousTime = millis();
+  isControlsBlocked = true;
+
+  // If not hungry, reject food.
+  if (hunger >= 4) {
+    humorCreature = NEGATIVE;
+    return;
+  }
+
+  // Default reaction.
+  humorCreature = POSITIVE;
+
+  switch (selectedLunch) {
+    case HAMBURGER:
+      if (hunger < 4) hunger++;
+      if (hunger < 4) hunger++;
+      if (happiness < 4) happiness++;
+      break;
+    case MEAT:
+      if (hunger < 4) hunger++;
+      if (hunger < 4) hunger++;
+      break;
+    case VEGGIES:
+      if (hunger < 4) hunger++;
+      if (happiness > 0) happiness--;
+      break;
+    case FRUIT:
+      if (hunger < 4) hunger++;
+      if (happiness < 4) happiness++;
+      break;
+    case PASTA:
+      if (hunger < 4) hunger++;
+      if (hunger < 4) hunger++;
+      break;
+    case ICECREAM:
+      if (hunger < 4) hunger++;
+      if (happiness < 4) happiness++;
+      if (happiness < 4) happiness++;
+      break;
+    default:
+      // Unknown food; do nothing.
+      humorCreature = NONE;
+      break;
+  }
+}
+
+// Study menu: increases education, may reduce happiness a bit.
+void drawStudyMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
+  (void)rectWidth;
+  (void)rectHeight;
+
+  uint8_t x = rectX + 8;
+  uint8_t y = rectY + 8;
+
+  arduboy.setCursor(x, y);
+  arduboy.print(F("B Study"));
+  arduboy.setCursor(x, y + 12);
+  arduboy.print(F("Edu +1"));
+
+  if (arduboy.justPressed(B_BUTTON)) {
+    if (isStudying) {
+      return;
+    }
+    isStudying = true;
+    previousTime = millis();
+    isControlsBlocked = true;
+
+    if (education < 4) {
+      education++;
+      // Studying is good, but can be boring.
+      if (happiness > 0 && random(100) < 40) {
+        happiness--;
+      }
+      humorCreature = POSITIVE;
+    } else {
+      humorCreature = NEGATIVE;
+    }
+
+    isMenuSelected = false;
+  }
+}
+
+// Shower menu: small happiness boost.
+void drawShowerMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
+  (void)rectWidth;
+  (void)rectHeight;
+
+  uint8_t x = rectX + 8;
+  uint8_t y = rectY + 8;
+
+  arduboy.setCursor(x, y);
+  arduboy.print(F("B Shower"));
+  arduboy.setCursor(x, y + 12);
+  arduboy.print(F("Happy +1"));
+
+  if (arduboy.justPressed(B_BUTTON)) {
+    if (isShowering) {
+      return;
+    }
+    isShowering = true;
+    previousTime = millis();
+    isControlsBlocked = true;
+
+    if (happiness < 4) {
+      happiness++;
+      humorCreature = POSITIVE;
+    } else {
+      humorCreature = NONE;
+    }
+
+    isMenuSelected = false;
+  }
+}
+
+// Climate menu: adjust temperature up/down.
+void drawClimateMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
+  (void)rectWidth;
+  (void)rectHeight;
+
+  uint8_t x = rectX + 10;
+  uint8_t y = rectY + 8;
+
+  arduboy.setCursor(x, y);
+  arduboy.print(F("Temp: "));
+  arduboy.print(temperature);
+  arduboy.print(F("C"));
+
+  uint8_t optY1 = y + 14;
+  uint8_t optY2 = y + 28;
+
+  arduboy.setCursor(x, optY1);
+  arduboy.print(F("Cool"));
+  if (selectedClimate == CLIMATE_COOL) {
+    arduboy.drawRect(x - 2, optY1 - 2, 28, 12, WHITE);
+  }
+
+  arduboy.setCursor(x, optY2);
+  arduboy.print(F("Warm"));
+  if (selectedClimate == CLIMATE_WARM) {
+    arduboy.drawRect(x - 2, optY2 - 2, 28, 12, WHITE);
+  }
+
+  if (arduboy.justPressed(B_BUTTON)) {
+    previousTime = millis();
+    isControlsBlocked = true;
+
+    if (selectedClimate == CLIMATE_COOL) {
+      if (temperature > 10) temperature--;
+    } else {
+      if (temperature < 40) temperature++;
+    }
+
+    humorCreature = POSITIVE;
+    isMenuSelected = false;
+  }
+}
+
+// Heal menu: converts happiness loss from low stats into a small recovery.
+void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
+  (void)rectWidth;
+  (void)rectHeight;
+
+  uint8_t x = rectX + 8;
+  uint8_t y = rectY + 8;
+
+  arduboy.setCursor(x, y);
+  arduboy.print(F("B Heal"));
+  arduboy.setCursor(x, y + 12);
+  arduboy.print(F("Happy +1"));
+
+  if (arduboy.justPressed(B_BUTTON)) {
+    if (isHealing) {
+      return;
+    }
+    isHealing = true;
+    previousTime = millis();
+    isControlsBlocked = true;
+
+    if (happiness < 4) {
+      happiness++;
+      humorCreature = POSITIVE;
+    } else {
+      humorCreature = NONE;
+    }
+
+    isMenuSelected = false;
   }
 }
 
@@ -468,6 +792,10 @@ void navigateSelectedPlay() {
   if(currentMenu != PLAY) {
     return;
   }
+  // Do not allow changing selection while the game is running or waiting for exit.
+  if (playInProgress || playFinished) {
+    return;
+  }
   if (arduboy.justPressed(DOWN_BUTTON)) {
       selectedPlay = (selectedPlay == SCISSORS) ? ROCK : selectedPlay + 1;
       emitBeep();
@@ -488,6 +816,16 @@ void navigateSelectedStatus() {
   } else if (arduboy.justPressed(UP_BUTTON)) {
       selectedStatus = (selectedStatus == HAPPINESS) ? NO_STATUS - 1 : selectedStatus - 1;
       emitBeep();
+  }
+}
+
+void navigateSelectedClimate() {
+  if (currentMenu != CLIMATE) {
+    return;
+  }
+  if (arduboy.justPressed(DOWN_BUTTON) || arduboy.justPressed(UP_BUTTON)) {
+    selectedClimate = (selectedClimate == CLIMATE_COOL) ? CLIMATE_WARM : CLIMATE_COOL;
+    emitBeep();
   }
 }
 
