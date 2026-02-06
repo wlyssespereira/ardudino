@@ -132,6 +132,16 @@ void loop() {
   arduboy.setCursor(iconXLeft + 42, centerY - rectHeight / 2 - 4);
   arduboy.print(menuNames[currentMenu]);
 
+  // Fill the creature viewport when the light is OFF.
+  // This affects only the central rectangle interior (not the side menus).
+  if (!isMenuSelected && !isLightOn) {
+    uint8_t viewportX = iconXLeft + 16;
+    uint8_t viewportY = centerY - rectHeight / 2 + 4;
+    uint8_t viewportW = rectWidth + 8;
+    uint8_t viewportH = rectHeight - 2;
+    arduboy.fillRect(viewportX, viewportY, viewportW, viewportH, WHITE);
+  }
+
   // Draw a square inside the central rectangle
   if (isMenuSelected) {
     drawSelectedMenu(iconXLeft + 15, centerY - rectHeight / 2 + 3, rectWidth + 10, rectHeight);
@@ -792,15 +802,16 @@ void navigateSelectedPlay() {
   if(currentMenu != PLAY) {
     return;
   }
-  // Do not allow changing selection while the game is running or waiting for exit.
-  if (playInProgress || playFinished) {
+  // Allow changing selection during the 5-round game.
+  // Only block navigation on the final result screen.
+  if (playFinished) {
     return;
   }
   if (arduboy.justPressed(DOWN_BUTTON)) {
-      selectedPlay = (selectedPlay == SCISSORS) ? ROCK : selectedPlay + 1;
+      selectedPlay = (selectedPlay == SCISSORS) ? ROCK : (SelectedPlay)(selectedPlay + 1);
       emitBeep();
   } else if (arduboy.justPressed(UP_BUTTON)) {
-      selectedPlay = (selectedPlay == ROCK) ? SCISSORS : selectedPlay - 1;
+      selectedPlay = (selectedPlay == ROCK) ? SCISSORS : (SelectedPlay)(selectedPlay - 1);
       emitBeep();
   }
 }
@@ -907,7 +918,7 @@ void drawCreature(uint8_t x, uint8_t y) {
   buildCreatPosArr(x, y, creatPosArr);
 
   for (uint8_t i = 0; i < 4; i++) {
-    drawCustomBitmap(creatPosArr[i] , creatureMatSprites[creatureCurrentFrame][i], 10, 10);
+    drawCustomBitmapCreature(creatPosArr[i] , creatureMatSprites[creatureCurrentFrame][i], 10, 10);
   }
 }
 
@@ -924,7 +935,7 @@ void drawHumorCreature(uint8_t x, uint8_t y) {
   buildCreatPosArr(x, y, creatPosArr);
 
   for (uint8_t i = 0; i < 4; i++) {
-    drawCustomBitmap(creatPosArr[i] , humorIcons[humorCreature][i], 10, 10);
+    drawCustomBitmapCreature(creatPosArr[i] , humorIcons[humorCreature][i], 10, 10);
   }
 }
 
@@ -941,7 +952,7 @@ void drawDoCaress(uint8_t x, uint8_t y) {
   buildCreatPosArr(x, y, creatPosArr);
 
   for (uint8_t i = 0; i < 4; i++) {
-    drawCustomBitmap(creatPosArr[i] , caressSprite[i], 10, 10);
+    drawCustomBitmapCreature(creatPosArr[i] , caressSprite[i], 10, 10);
   }
 
   humorCreature = POSITIVE;
@@ -1036,3 +1047,32 @@ void drawCustomBitmap(uint8_t x, uint8_t y, const uint8_t* sprite, uint8_t width
     }
   }
 }
+
+// Light-aware bitmap drawing for the creature viewport.
+// When the light is OFF, the viewport background becomes WHITE and sprites are drawn inverted (BLACK on WHITE).
+void drawCustomBitmapCreature(uint8_t x, uint8_t y, const uint8_t* sprite, uint8_t width, uint8_t height) {
+  uint8_t color = WHITE;
+
+  for (uint8_t row = 0; row < height; row++) {
+    for (uint8_t col = 0; col < width; col++) {
+      if (pgm_read_byte_near(sprite + row) & (1 << (width - col - 1))) {
+        if (row < 2) {
+          color = BLACK;
+        }
+
+        if (!isLightOn) {
+          // Invert only inside the creature viewport.
+          color = (color == WHITE) ? BLACK : WHITE;
+        }
+
+        arduboy.drawPixel(x + col, y + row, color);
+        color = WHITE;
+      }
+    }
+  }
+}
+
+void drawCustomBitmapCreature(const uint8_t* posXaY, const uint8_t* sprite, uint8_t width, uint8_t height) {
+  drawCustomBitmapCreature(posXaY[0], posXaY[1], sprite, width, height);
+}
+
