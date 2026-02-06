@@ -720,6 +720,23 @@ void drawClimateMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t re
 }
 
 // Heal menu: converts happiness loss from low stats into a small recovery.
+
+// Returns true if the creature is currently sick.
+// This is a lightweight rule-based check that relies on existing stats (no new persistent state).
+bool isCreatureSick() {
+  // Temperature out of the comfort range makes the creature sick.
+  if (temperature <= 14 || temperature >= 32) {
+    return true;
+  }
+
+  // Being very hungry or very thirsty also makes the creature sick.
+  if (hunger <= 1 || thirst <= 1) {
+    return true;
+  }
+
+  return false;
+}
+
 void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
   (void)rectWidth;
   (void)rectHeight;
@@ -727,28 +744,58 @@ void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectH
   uint8_t x = rectX + 8;
   uint8_t y = rectY + 8;
 
+  const bool sick = isCreatureSick();
+
   arduboy.setCursor(x, y);
   arduboy.print(F("B Heal"));
+
   arduboy.setCursor(x, y + 12);
-  arduboy.print(F("Happy +1"));
+  if (sick) {
+    arduboy.print(F("Happy +1"));
+  } else {
+    arduboy.print(F("Not sick"));
+  }
 
   if (arduboy.justPressed(B_BUTTON)) {
     if (isHealing) {
       return;
     }
+
     isHealing = true;
     previousTime = millis();
     isControlsBlocked = true;
 
-    if (happiness < 4) {
-      happiness++;
-      humorCreature = POSITIVE;
-    } else {
-      humorCreature = NONE;
+    if (!sick) {
+      // Healing has no effect when the creature is not sick.
+      humorCreature = NEGATIVE;
+      emitBeep();
+      return;
     }
 
+    // Apply heal effects only when sick.
+    if (happiness < 4) {
+      happiness++;
+    }
+
+    // Push temperature back toward a safe default.
+    const uint8_t targetTemp = 22;
+    if (temperature < targetTemp) {
+      temperature = (uint8_t)min((int)temperature + 2, (int)targetTemp);
+    } else if (temperature > targetTemp) {
+      temperature = (uint8_t)max((int)temperature - 2, (int)targetTemp);
+    }
+
+    humorCreature = POSITIVE;
+
+    markStateDirty();
     isMenuSelected = false;
   }
+}
+
+void markStateDirty() {
+  // Stub: EEPROM persistence is not enabled in this branch yet.
+  // This function exists to keep patches compatible and will be replaced
+  // by a real "dirty flag" + autosave logic when persistence is implemented.
 }
 
 // Function to draw the light menu
