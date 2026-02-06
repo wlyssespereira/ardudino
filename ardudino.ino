@@ -164,6 +164,8 @@ void loop() {
   // Draw an action with the creature
   drawDoCaress(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
   drawDrinkWater(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+  drawDoStudy(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+  drawDoShower(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
   // Update the creature's animation
   unsigned long currentTime = millis();
@@ -973,6 +975,49 @@ void drawDrinkWater(uint8_t x, uint8_t y) {
 
   for (uint8_t i = 0; i < 4; i++) {
     drawCustomBitmap(creatPosArr[i] , glassOfWater[i], 10, 10);
+  }
+
+  isMenuSelected = false;
+}
+
+
+void drawDoStudy(uint8_t x, uint8_t y) {
+  if(isStudying == false) {
+    return;
+  }
+
+  // Position the overlay near the creature.
+  x -= 22;
+  y -= 20 + creatureCurrentFrame;
+
+  uint8_t creatPosArr[4][2];
+  buildCreatPosArr(x, y, creatPosArr);
+
+  uint8_t frame = (millis() / 220) % 2;
+
+  for (uint8_t i = 0; i < 4; i++) {
+    drawCustomBitmapCreature(creatPosArr[i], studyMatSprites[frame][i], 10, 10);
+  }
+
+  isMenuSelected = false;
+}
+
+void drawDoShower(uint8_t x, uint8_t y) {
+  if(isShowering == false) {
+    return;
+  }
+
+  // Position the overlay above the creature.
+  x -= 22;
+  y -= 28 + creatureCurrentFrame;
+
+  uint8_t creatPosArr[4][2];
+  buildCreatPosArr(x, y, creatPosArr);
+
+  uint8_t frame = (millis() / 180) % 2;
+
+  for (uint8_t i = 0; i < 4; i++) {
+    drawCustomBitmapCreature(creatPosArr[i], showerMatSprites[frame][i], 10, 10);
   }
 
   isMenuSelected = false;
