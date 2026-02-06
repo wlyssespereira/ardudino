@@ -52,7 +52,9 @@ uint8_t weight          = 1;  // Text
 uint8_t age             = 0;  // Text
 uint8_t temperature     = 25; // Text
 
-uint16_t playMenuResult  = 0;
+uint16_t playMenuResult = 0;
+bool hasPlayResult      = false;
+int8_t lastPlayResult   = 0;
 
 bool isStartScreen      = true;
 bool isControlsBlocked  = false;
@@ -67,8 +69,10 @@ bool isInFoodMenu       = false;
 void setup() {
   arduboy.begin();
   arduboy.setFrameRate(15);
-  previousTime = millis(); // Initialize the previous time
+  randomSeed(millis());
+  previousTime = millis();
 }
+
 
 void loop() {
   if (!arduboy.nextFrame()) {
@@ -208,25 +212,13 @@ void drawLateralMenus() {
 // Function to draw the selected menu
 void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
   switch (currentMenu) {
-    case DRINK:
-      doDrinkingWater();
-      break;
-    case FOOD:
-      drawFoodMenu(rectX, rectY);
-      break;
-    case LIGHT:
-      drawLightMenu(rectX, rectY, rectWidth, rectHeight);
-      break;
-    case CARESS:
-      doCaress();
-      break;
-    case STATUS:
-      drawStatusMenu(rectX, rectY);
-      break;
-    case PLAY:
-      drawPlayMenu(rectX, rectY);
-    default:
-      return;
+    case DRINK:   doDrinkingWater();                                  break;
+    case FOOD:    drawFoodMenu(rectX, rectY);                         break;
+    case LIGHT:   drawLightMenu(rectX, rectY, rectWidth, rectHeight); break;
+    case CARESS:  doCaress();                                         break;
+    case STATUS:  drawStatusMenu(rectX, rectY);                       break;
+    case PLAY:    drawPlayMenu(rectX, rectY);                         break;
+    default: return;
   }
 }
 
@@ -357,36 +349,22 @@ void drawPlayMenu(uint8_t x, uint8_t y) {
   }
 
   int16_t result;
-  if(arduboy.justPressed(B_BUTTON)) {
+  if (arduboy.justPressed(B_BUTTON)) {
     initPlayGame();
     selectedDinoPlay = getDinoMove();
-    result = determineWinner(selectedPlay, selectedDinoPlay);
-    
+    lastPlayResult = determineWinner(selectedPlay, selectedDinoPlay);
+    hasPlayResult = true;
 
+    // regra: dino feliz quando vence
+    if (lastPlayResult == -1 && happiness < 4) happiness++;
+    if (lastPlayResult ==  1 && happiness > 0) happiness--; // opcional: perder te deixa triste
   }
 
-  x -= 10;
-  y += 20;
-  arduboy.setCursor(x, y);
-  arduboy.print(result);
-  switch (result) {
-    case 1:
-      arduboy.print('O');
-      break;
-    case -1:
-      arduboy.print('X');
-      break;
-    case 0:
-      arduboy.print('-');
-      break;
-    default:
-      arduboy.print('-');
+  if (hasPlayResult) {
+    arduboy.setCursor(x, y);
+    arduboy.print(lastPlayResult);
+    // ... seu switch que imprime O/X/-
   }
-
-
-
-
-
 
 }
 
@@ -400,7 +378,7 @@ void initPlayGame() {
 
 // Get a random move for dino play.
 SelectedPlay getDinoMove() {
-  return static_cast<SelectedPlay>(rand() % 3);
+  return static_cast<SelectedPlay>(random(3));
 }
 
 // Function to determine the winner of the Rock, Paper, Scissors game
@@ -412,19 +390,15 @@ SelectedPlay getDinoMove() {
 //   - Returns -1 if the second player wins
 //   - Returns 0 if there is a tie
 //   - Returns -2 in case of an unexpected error (value out of expected range)
-uint16_t determineWinner(SelectedPlay selectedPlay, SelectedPlay selectedDinoPlay) {
-  if (selectedPlay == selectedDinoPlay) {
-    return 0; // Draw
-  }
+int8_t determineWinner(SelectedPlay selectedPlay, SelectedPlay selectedDinoPlay) {
+  if (selectedPlay == selectedDinoPlay) return 0;
+
   switch (selectedPlay) {
-    case ROCK:
-      return (selectedDinoPlay == SCISSORS) ? 1 : -1;
-    case PAPER:
-      return (selectedDinoPlay == ROCK) ? 1 : -1;
-    case SCISSORS:
-      return (selectedDinoPlay == PAPER) ? 1 : -1;
+    case ROCK:     return (selectedDinoPlay == SCISSORS) ?  1 : -1;
+    case PAPER:    return (selectedDinoPlay == ROCK)    ?  1 : -1;
+    case SCISSORS: return (selectedDinoPlay == PAPER)   ?  1 : -1;
+    default:       return -2;
   }
-  return -2; // Error
 }
 
 // Function to draw the food menu
