@@ -1,9 +1,1 @@
-
-https://gotchi-garden.blogspot.com/p/dinkie-dino-care-sheet.html
-
 https://xantorohara.github.io/led-matrix-editor/
-
-
-.\ProjectABE.exe "C:\Users\Wlysses\AppData\Local\Temp\arduino\sketches\B69A000368DABEE21C04686D9E721DA1\ardudino.ino.hex"
-
-
