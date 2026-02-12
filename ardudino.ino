@@ -83,6 +83,39 @@ bool isStudying         = false;
 bool isShowering        = false;
 bool isHealing          = false;
 
+// -----------------------------
+// GAME CLOCK
+// -----------------------------
+uint8_t gameHour                    = 8;
+uint8_t gameMinute                  = 0;
+unsigned long lastMinuteTick        = 0;
+const unsigned long minuteInterval  = 1000;
+bool isSleeping                     = false;
+
+const uint8_t z5x5_0[] PROGMEM = {
+  B11111000,
+  B00010000,
+  B00100000,
+  B01000000,
+  B11111000
+};
+
+const uint8_t z5x5_1[] PROGMEM = {
+  B00000000,
+  B11111000,
+  B00100000,
+  B01000000,
+  B11111000
+};
+
+void drawSleepZ(uint8_t x, uint8_t y) {
+  uint8_t frame = (millis() / 350) % 2;
+  uint8_t floatY = (millis() / 500) % 2; // sobe/desce 1px
+
+  const uint8_t* zSpr = frame ? z5x5_1 : z5x5_0;
+  drawCustomBitmapCreature(x, y - floatY, zSpr, 5, 5);
+}
+
 void setup() {
   arduboy.begin();
   arduboy.setFrameRate(15);
@@ -109,6 +142,9 @@ void loop() {
     }
     return;
   }
+
+  updateClock();
+  updateSleepEffects();
 
   // Clear the screen
   arduboy.clear();
@@ -159,6 +195,9 @@ void loop() {
   // Draw the creature's status
   drawHumorCreature(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
+  // Render the clock
+  renderClock();
+
   // Draw an action with the creature
   drawDoCaress(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
   drawDrinkWater(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
@@ -179,6 +218,40 @@ void loop() {
   resetHumor(currentTime);
 
   arduboy.display();
+}
+
+void renderClock() {
+  char buffer[6];
+  sprintf(buffer, "%02d:%02d", gameHour, gameMinute);
+
+  arduboy.setCursor(80, 0);
+  arduboy.print(buffer);
+}
+
+void updateClock() {
+  if (millis() - lastMinuteTick >= minuteInterval) {
+    lastMinuteTick = millis();
+
+    gameMinute++;
+
+    if (gameMinute >= 60) {
+      gameMinute = 0;
+      gameHour++;
+
+      if (gameHour >= 24) {
+        gameHour = 0;
+      }
+    }
+
+    // Sleep schedule
+    if (gameHour == 0 && gameMinute == 0) {
+      isSleeping = true;
+    }
+
+    if (gameHour == 9 && gameMinute == 0) {
+      isSleeping = false;
+    }
+  }
 }
 
 // Function to execute the controls.
@@ -795,6 +868,27 @@ void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectH
   }
 }
 
+void updateSleepEffects() {
+
+  if (!isSleeping) return;
+
+  static unsigned long lastSleepTick = 0;
+
+  if (millis() - lastSleepTick >= 2000) { // each 2 seconds
+    lastSleepTick = millis();
+
+    if (!isLightOn) {
+      // Sleeping in dark = better
+      if (happiness < 4) happiness++;
+    } else {
+      // Sleeping in clear = worst
+      if (hunger > 0) hunger--;
+      if (thirst > 0) thirst--;
+      if (happiness > 0) happiness--;
+    }
+  }
+}
+
 // Function to draw the light menu
 void drawLightMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
   // Define the coordinates of the text menus
@@ -962,13 +1056,17 @@ void drawCreature(uint8_t x, uint8_t y) {
   uint8_t creatPosArr[4][2];
   buildCreatPosArr(x, y, creatPosArr);
 
-  // When the light is OFF, show a simple sleeping animation instead of the regular creature frames.
-  if (!isLightOn) {
+  // Sleeping animation depends ONLY on isSleeping (not on light)
+  if (isSleeping) {
     uint8_t sleepFrame = (millis() / 500) % 2;
 
     for (uint8_t i = 0; i < 4; i++) {
       drawCustomBitmapCreature(creatPosArr[i], sleepMatSprites[sleepFrame][i], 10, 10);
     }
+
+    // optional: draw a small "Z" floating (see below)
+    drawSleepZ(x + 22, y - 6);
+
     return;
   }
 
@@ -978,7 +1076,7 @@ void drawCreature(uint8_t x, uint8_t y) {
 }
 
 void drawHumorCreature(uint8_t x, uint8_t y) {
-  if (isMenuSelected || !isLightOn || humorCreature == NONE) {
+  if (isMenuSelected || humorCreature == NONE) {
     return;
   }
 
