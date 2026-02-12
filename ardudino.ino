@@ -260,22 +260,45 @@ void executeControls() {
     return;
   }
 
-  // Check if the left button was pressed to navigate between the left menus
-  if (arduboy.justPressed(LEFT_BUTTON) && !isMenuSelected) {
-    if (currentMenu >= (numMenus / 2)) {
-      currentMenu = DRINK - 1;
-    }
-    currentMenu = static_cast<Menu>((currentMenu + 1) % (numMenus / 2));
-    emitBeep();
-  }
+  // Navigate menus when not inside a menu:
+  // UP/DOWN = move inside the current side
+  // LEFT/RIGHT = switch side (keep same index)
+  if (!isMenuSelected) {
 
-  // Check if the right button was pressed to navigate between the right menus
-  if (arduboy.justPressed(RIGHT_BUTTON) && !isMenuSelected) {
-    if (currentMenu < (numMenus / 2)) {
-      currentMenu = PLAY - 1;
+    const uint8_t half = numMenus / 2;
+
+    // Determine current side and index inside the side
+    bool onLeftSide = ((uint8_t)currentMenu < half);
+    uint8_t idx = onLeftSide ? (uint8_t)currentMenu : ((uint8_t)currentMenu - half);
+
+    // UP = previous item in the same side
+    if (arduboy.justPressed(UP_BUTTON)) {
+      if (idx == 0) idx = half - 1;
+      else idx--;
+
+      currentMenu = onLeftSide ? (Menu)idx : (Menu)(half + idx);
+      emitBeep();
     }
-    currentMenu = static_cast<Menu>((currentMenu + 1) % (numMenus / 2) + (numMenus / 2));
-    emitBeep();
+
+    // DOWN = next item in the same side
+    if (arduboy.justPressed(DOWN_BUTTON)) {
+      idx = (idx + 1) % half;
+
+      currentMenu = onLeftSide ? (Menu)idx : (Menu)(half + idx);
+      emitBeep();
+    }
+
+    // RIGHT = go to right side (keep idx)
+    if (arduboy.justPressed(RIGHT_BUTTON) && onLeftSide) {
+      currentMenu = (Menu)(half + idx);
+      emitBeep();
+    }
+
+    // LEFT = go to left side (keep idx)
+    if (arduboy.justPressed(LEFT_BUTTON) && !onLeftSide) {
+      currentMenu = (Menu)idx;
+      emitBeep();
+    }
   }
 
   // B selects the current menu.
