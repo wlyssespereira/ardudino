@@ -163,7 +163,7 @@ void loop() {
   arduboy.drawRect(iconXLeft + 15, centerY - rectHeight / 2 + 3, rectWidth + 10, rectHeight, WHITE);
 
   // Draw the name of the selected menu
-  arduboy.setCursor(iconXLeft + 42, centerY - rectHeight / 2 - 4);
+  arduboy.setCursor(iconXLeft + 40, centerY - rectHeight / 2 - 4);
   arduboy.print(menuNames[currentMenu]);
 
   // Fill the creature viewport when the light is OFF.
@@ -1155,21 +1155,23 @@ void drawDrinkWater(uint8_t x, uint8_t y) {
 }
 
 void drawDoStudy(uint8_t x, uint8_t y) {
-  if(isStudying == false) {
+  if (!isStudying) {
     return;
   }
 
   // Position the overlay near the creature.
   x -= 22;
-  y -= 20 + creatureCurrentFrame;
+
+  // Small bob animation (1px up/down) - cheap and looks alive
+  uint8_t bob = (millis() / 220) % 2;
+  y -= (10 + creatureCurrentFrame + bob);
 
   uint8_t creatPosArr[4][2];
   buildCreatPosArr(x, y, creatPosArr);
 
-  uint8_t frame = (millis() / 220) % 2;
-
+  // Reuse the Education status book sprite for the study animation
   for (uint8_t i = 0; i < 4; i++) {
-    drawCustomBitmapCreature(creatPosArr[i], studyMatSprites[frame][i], 10, 10);
+    drawCustomBitmapCreature(creatPosArr[i], statusSprites[EDUCATION][i], 10, 10);
   }
 
   isMenuSelected = false;
@@ -1181,8 +1183,8 @@ void drawDoShower(uint8_t x, uint8_t y) {
   }
 
   // Position the overlay above the creature.
-  x -= 22;
-  y -= 28 + creatureCurrentFrame;
+  x -= 10;
+  y -= 22 + creatureCurrentFrame;
 
   uint8_t creatPosArr[4][2];
   buildCreatPosArr(x, y, creatPosArr);
