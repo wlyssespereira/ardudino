@@ -86,31 +86,15 @@ bool isHealing          = false;
 // -----------------------------
 // GAME CLOCK
 // -----------------------------
-uint8_t gameHour                    = 8;
+uint8_t gameHour                    = 0;
 uint8_t gameMinute                  = 0;
 unsigned long lastMinuteTick        = 0;
 const unsigned long minuteInterval  = 1000;
 bool isSleeping                     = false;
 
-const uint8_t z5x5_0[] PROGMEM = {
-  B11111000,
-  B00010000,
-  B00100000,
-  B01000000,
-  B11111000
-};
-
-const uint8_t z5x5_1[] PROGMEM = {
-  B00000000,
-  B11111000,
-  B00100000,
-  B01000000,
-  B11111000
-};
-
 void drawSleepZ(uint8_t x, uint8_t y) {
-  uint8_t frame = (millis() / 350) % 2;
-  uint8_t floatY = (millis() / 500) % 2; // sobe/desce 1px
+  uint8_t frame   = (millis() / 350) % 2;
+  uint8_t floatY  = (millis() / 500) % 2;
 
   const uint8_t* zSpr = frame ? z5x5_1 : z5x5_0;
   drawCustomBitmapCreature(x, y - floatY, zSpr, 5, 5);
@@ -199,10 +183,10 @@ void loop() {
   renderClock();
 
   // Draw an action with the creature
-  drawDoCaress(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+  drawDoCaress  (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
   drawDrinkWater(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
-  drawDoStudy(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
-  drawDoShower(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+  drawDoStudy   (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+  drawDoShower  (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
   // Update the creature's animation
   unsigned long currentTime = millis();
@@ -244,11 +228,11 @@ void updateClock() {
     }
 
     // Sleep schedule
-    if (gameHour == 0 && gameMinute == 0) {
+    if (gameHour < 9) {
       isSleeping = true;
     }
 
-    if (gameHour == 9 && gameMinute == 0) {
+    if (gameHour >= 9) {
       isSleeping = false;
     }
   }
@@ -351,16 +335,16 @@ void drawLateralMenus() {
 // Function to draw the selected menu
 void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
   switch (currentMenu) {
-    case DRINK:   doDrinkingWater();                                  break;
-    case FOOD:    drawFoodMenu(rectX, rectY);                         break;
-    case LIGHT:   drawLightMenu(rectX, rectY, rectWidth, rectHeight); break;
-    case CARESS:  doCaress();                                         break;
-    case STATUS:  drawStatusMenu(rectX, rectY);                       break;
-    case PLAY:    drawPlayMenu(rectX, rectY);                         break;
-    case STUDY:   drawStudyMenu(rectX, rectY, rectWidth, rectHeight); break;
-    case SHOWER:  drawShowerMenu(rectX, rectY, rectWidth, rectHeight);break;
-    case CLIMATE: drawClimateMenu(rectX, rectY, rectWidth, rectHeight);break;
-    case HEAL:    drawHealMenu(rectX, rectY, rectWidth, rectHeight);  break;
+    case DRINK:   doDrinkingWater();                                    break;
+    case FOOD:    drawFoodMenu(rectX, rectY);                           break;
+    case LIGHT:   drawLightMenu(rectX, rectY, rectWidth, rectHeight);   break;
+    case CARESS:  doCaress();                                           break;
+    case STATUS:  drawStatusMenu(rectX, rectY);                         break;
+    case PLAY:    drawPlayMenu(rectX, rectY);                           break;
+    case STUDY:   drawStudyMenu(rectX, rectY, rectWidth, rectHeight);   break;
+    case SHOWER:  drawShowerMenu(rectX, rectY, rectWidth, rectHeight);  break;
+    case CLIMATE: drawClimateMenu(rectX, rectY, rectWidth, rectHeight); break;
+    case HEAL:    drawHealMenu(rectX, rectY, rectWidth, rectHeight);    break;
     default: return;
   }
 }

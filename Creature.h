@@ -35,6 +35,22 @@ const char* statusNames[] = {
 
 // https://xantorohara.github.io/led-matrix-editor/
 
+const uint8_t z5x5_0[] PROGMEM = {
+  B11111000,
+  B00010000,
+  B00100000,
+  B01000000,
+  B11111000
+};
+
+const uint8_t z5x5_1[] PROGMEM = {
+  B00000000,
+  B11111000,
+  B00100000,
+  B01000000,
+  B11111000
+};
+
 const PROGMEM uint8_t creatureMatSprites[][4][10] = {
   {
     { 8,
@@ -365,97 +381,88 @@ const PROGMEM uint8_t showerMatSprites[][4][10] = {
 };
 
 // Sleep animation sprites (2 frames)
-// When the light is OFF, the creature is shown sleeping with a "Z" above its head.
+// Based on creatureMatSprites frame 2 (eyes closed).
+// Frame 1 slightly changes the top contour to simulate breathing.
 const PROGMEM uint8_t sleepMatSprites[][4][10] = {
-
-  // Frame 0: sleeping (crouched) + Z
+  // Frame 0: base (eyes closed)
   {
     { 8, 8,
-      0b00000000,
-      0b00000000,
-      0b00011000,
-      0b00100100,
-      0b00100100,
-      0b00011000,
-      0b00000000,
-      0b00000000 },
-
+      0b00111111,
+      0b00111111,
+      0b11110000,
+      0b11110000,
+      0b11000000,
+      0b11000000,
+      0b11011110,
+      0b11000000 },
     { 8, 8,
-      0b00000000,
-      0b01111110,
-      0b00000110,
-      0b00001100,
-      0b00011000,
-      0b00110000,
-      0b01111110,
-      0b00000000 },
-
+      0b11111100,
+      0b11111100,
+      0b00001111,
+      0b00001111,
+      0b00000011,
+      0b00000011,
+      0b01111011,
+      0b00000011 },
     { 8, 8,
-      0b00000000,
-      0b00111100,
-      0b01111110,
-      0b01100110,
-      0b01100110,
-      0b00111100,
-      0b00000000,
+      0b11000000,
+      0b11000000,
+      0b11000000,
+      0b11000000,
+      0b11000000,
+      0b11111111,
+      0b11111111,
       0b00000000 },
-
     { 8, 8,
-      0b00000000,
-      0b00011000,
-      0b00111100,
-      0b01111110,
-      0b01111110,
-      0b00111100,
-      0b00011000,
+      0b00000011,
+      0b00000011,
+      0b00000011,
+      0b00000011,
+      0b00000011,
+      0b11111111,
+      0b11111111,
       0b00000000 }
   },
-
-  // Frame 1: sleeping (slightly different) + Z (blink)
+  // Frame 1: breathing (top contour slightly "inflated")
   {
     { 8, 8,
       0b00000000,
-      0b00000000,
-      0b00011000,
-      0b00100100,
-      0b00100100,
-      0b00011000,
-      0b00000000,
-      0b00000000 },
-
+      0b01111111,  // was 0b00111111 (adds 1 bit on top contour)
+      0b00111111,
+      0b11110000,
+      0b11110000,
+      0b11000000,
+      0b11011110,
+      0b11000000 },
     { 8, 8,
       0b00000000,
-      0b01111110,
-      0b00000110,
-      0b00001100,
-      0b00011000,
-      0b00110000,
-      0b01111110,
-      0b00000000 },
-
+      0b11111110,  // was 0b11111100 (adds 1 bit on top contour)
+      0b11111100,
+      0b00001111,
+      0b00001111,
+      0b00000011,
+      0b01111011,
+      0b00000011 },
     { 8, 8,
-      0b00000000,
-      0b00111100,
-      0b01111110,
-      0b01100110,
-      0b01100110,
-      0b00111100,
-      0b00000000,
+      0b11100000,  // was 0b11000000 (slight bulge at upper-left of bottom tiles)
+      0b11000000,
+      0b11000000,
+      0b11000000,
+      0b11000000,
+      0b11111111,
+      0b11111111,
       0b00000000 },
-
     { 8, 8,
-      0b00000000,
-      0b00011000,
-      0b00111100,
-      0b01111110,
-      0b01111110,
-      0b00100100,
-      0b00011000,
+      0b00000111,  // was 0b00000011 (slight bulge at upper-right of bottom tiles)
+      0b00000011,
+      0b00000011,
+      0b00000011,
+      0b00000011,
+      0b11111111,
+      0b11111111,
       0b00000000 }
   }
 };
-
-
 
 const PROGMEM uint8_t glassOfWater[][10] = {
   { 8, 8,
