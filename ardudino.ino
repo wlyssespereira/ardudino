@@ -336,6 +336,13 @@ void drawLateralMenus() {
 
 // Function to draw the selected menu
 void drawSelectedMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
+
+  // While sleeping, only allow Status and Light
+  if (isSleeping && currentMenu != STATUS && currentMenu != LIGHT) {
+    isMenuSelected = false;
+    return;
+  }
+
   switch (currentMenu) {
     case DRINK:   doDrinkingWater();                                    break;
     case FOOD:    drawFoodMenu(rectX, rectY);                           break;
