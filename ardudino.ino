@@ -92,9 +92,9 @@ unsigned long lastMinuteTick        = 0;
 const unsigned long minuteInterval  = 1000;
 bool isSleeping                     = false;
 
-void drawSleepZ(int16_t x, int16_t y) {
-  uint8_t frame = (millis() / 450) % 2;
-  int8_t floatY = (millis() / 700) % 2;
+void drawSleepZ(int16_t x, int16_t y, uint16_t timeOffset) {
+  uint8_t frame = ((millis() + timeOffset) / 450) % 2;
+  int8_t floatY = ((millis() + timeOffset) / 700) % 2;
 
   int16_t yy = y - floatY;
   if (yy < 0) yy = 0;
@@ -1074,8 +1074,8 @@ void drawCreature(uint8_t x, uint8_t y) {
     }
 
     // optional: draw a small "Z" floating (see below)
-    drawSleepZ(x + 18, y - 4);
-    drawSleepZ(x + 22, y - 8);
+    drawSleepZ(x + 18, y - 4, 0);
+    drawSleepZ(x + 22, y - 8, 300);
 
     return;
   }
