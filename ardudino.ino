@@ -92,12 +92,14 @@ unsigned long lastMinuteTick        = 0;
 const unsigned long minuteInterval  = 1000;
 bool isSleeping                     = false;
 
-void drawSleepZ(uint8_t x, uint8_t y) {
-  uint8_t frame   = (millis() / 350) % 2;
-  uint8_t floatY  = (millis() / 500) % 2;
+void drawSleepZ(int16_t x, int16_t y) {
+  uint8_t frame = (millis() / 450) % 2;
+  int8_t floatY = (millis() / 700) % 2;
 
-  const uint8_t* zSpr = frame ? z5x5_1 : z5x5_0;
-  drawCustomBitmapCreature(x, y - floatY, zSpr, 5, 5);
+  int16_t yy = y - floatY;
+  if (yy < 0) yy = 0;
+
+  drawCustomBitmapCreature((uint8_t)x, (uint8_t)yy, sleepZSprites[frame], 8, 8);
 }
 
 void setup() {
@@ -1072,7 +1074,8 @@ void drawCreature(uint8_t x, uint8_t y) {
     }
 
     // optional: draw a small "Z" floating (see below)
-    drawSleepZ(x + 22, y - 6);
+    drawSleepZ(x + 18, y - 4);
+    drawSleepZ(x + 22, y - 8);
 
     return;
   }

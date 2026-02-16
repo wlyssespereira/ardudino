@@ -35,20 +35,29 @@ const char* statusNames[] = {
 
 // https://xantorohara.github.io/led-matrix-editor/
 
-const uint8_t z5x5_0[] PROGMEM = {
-  B11111000,
-  B00010000,
-  B00100000,
-  B01000000,
-  B11111000
-};
+// Small "Z" sprite as an 8x8 tile (with header), compatible with drawCustomBitmapCreature
+const PROGMEM uint8_t sleepZSprites[][10] = {
+  // Frame 0
+  { 8, 8,
+    0b00000000,
+    0b00111110,
+    0b00001000,
+    0b00010000,
+    0b00100000,
+    0b00111110,
+    0b00000000,
+    0b00000000 },
 
-const uint8_t z5x5_1[] PROGMEM = {
-  B00000000,
-  B11111000,
-  B00100000,
-  B01000000,
-  B11111000
+  // Frame 1 (slightly shifted for flicker)
+  { 8, 8,
+    0b00000000,
+    0b00011111,
+    0b00000100,
+    0b00001000,
+    0b00010000,
+    0b00011111,
+    0b00000000,
+    0b00000000 }
 };
 
 const PROGMEM uint8_t creatureMatSprites[][4][10] = {
