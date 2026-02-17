@@ -1,8 +1,30 @@
 #include <Arduboy2.h>
+#include <EEPROM.h>
+
 #include "Menus.h"
 #include "Creature.h"
 #include "Foods.h"
 #include "Play.h"
+
+struct SaveData {
+  uint8_t magic;
+  uint8_t version;
+
+  uint8_t hunger;
+  uint8_t thirst;
+  uint8_t happiness;
+  uint8_t education;
+
+  uint8_t age;
+  uint8_t weight;
+  uint8_t temperature;
+
+  uint8_t hour;
+  uint8_t minute;
+
+  uint8_t flags;     // bit0 = lightOn
+  uint8_t checksum;  // XOR checksum of all bytes except checksum
+};
 
 Arduboy2 arduboy;
 
@@ -120,8 +142,112 @@ bool isSleeping                     = false;
 
 const __FlashStringHelper* toastMsg = nullptr;
 uint8_t toastFramesLeft = 0;
-
 uint8_t shakeFramesLeft = 0;
+
+// -----------------------------
+// PATCH 3: EEPROM persistence
+// -----------------------------
+
+static const uint8_t kSaveMagic   = 0xAD;
+static const uint8_t kSaveVersion = 1;
+
+static const uint16_t kEepromAddr = 0;
+
+// Autosave throttle (avoid EEPROM wear)
+static const uint32_t kAutosaveIntervalMs = 20000; // 20s
+
+bool stateDirty = false;
+uint32_t lastAutosaveMs = 0;
+
+uint8_t computeChecksum(const SaveData &d) {
+  const uint8_t* p = (const uint8_t*)&d;
+  uint8_t x = 0;
+  // checksum excludes last byte (checksum itself)
+  for (uint16_t i = 0; i < sizeof(SaveData) - 1; i++) {
+    x ^= p[i];
+  }
+  return x;
+}
+
+void eepromWriteUpdate(uint16_t addr, const uint8_t* data, uint16_t len) {
+  for (uint16_t i = 0; i < len; i++) {
+    EEPROM.update(addr + i, data[i]); // update avoids writing same value
+  }
+}
+
+bool loadState() {
+  SaveData d;
+  EEPROM.get(kEepromAddr, d);
+
+  if (d.magic != kSaveMagic) return false;
+  if (d.version != kSaveVersion) return false;
+  if (computeChecksum(d) != d.checksum) return false;
+
+  hunger      = d.hunger;
+  thirst      = d.thirst;
+  happiness   = d.happiness;
+  education   = d.education;
+
+  age         = d.age;
+  weight      = d.weight;
+  temperature = d.temperature;
+
+  gameHour    = d.hour;
+  gameMinute  = d.minute;
+
+  isLightOn   = (d.flags & 0x01) != 0;
+
+  // Safety clamps
+  clampCoreStats();
+  if (temperature < 10) temperature = 10;
+  if (temperature > 40) temperature = 40;
+
+  // Recompute sleep state based on schedule
+  isSleeping = (gameHour < 9);
+
+  // Avoid instant clock tick after load
+  lastMinuteTick = millis();
+
+  stateDirty = false;
+  return true;
+}
+
+void saveState() {
+  SaveData d;
+  d.magic   = kSaveMagic;
+  d.version = kSaveVersion;
+
+  d.hunger    = hunger;
+  d.thirst    = thirst;
+  d.happiness = happiness;
+  d.education = education;
+
+  d.age         = age;
+  d.weight      = weight;
+  d.temperature = temperature;
+
+  d.hour   = gameHour;
+  d.minute = gameMinute;
+
+  d.flags = 0;
+  if (isLightOn) d.flags |= 0x01;
+
+  d.checksum = computeChecksum(d);
+
+  eepromWriteUpdate(kEepromAddr, (const uint8_t*)&d, sizeof(SaveData));
+
+  stateDirty = false;
+  lastAutosaveMs = millis();
+}
+
+void updateAutosave() {
+  if (!stateDirty) return;
+
+  uint32_t now = millis();
+  if (now - lastAutosaveMs >= kAutosaveIntervalMs) {
+    saveState();
+  }
+}
 
 // Toast: show a short message for N frames (cheap UX feedback)
 void showToast(const __FlashStringHelper* msg, uint8_t frames = 30) {
@@ -213,7 +339,9 @@ void setup() {
   arduboy.setFrameRate(15);
   randomSeed(millis());
   previousTime = millis();
+  loadState();
 }
+
 
 void loop() {
   if (!arduboy.nextFrame()) {
@@ -239,9 +367,9 @@ void loop() {
   updateSleepEffects();
 
   updateToast();
-  if (shakeFramesLeft > 0) {
-    shakeFramesLeft--;
-  }
+  if (shakeFramesLeft > 0) shakeFramesLeft--;
+
+  updateAutosave();
 
   // Clear the screen
   arduboy.clear();
@@ -332,6 +460,7 @@ void updateClock() {
     lastMinuteTick = millis();
 
     gameMinute++;
+    markStateDirty();
 
     // PATCH 2: Metabolism tick each N in-game minutes
     static uint8_t metabolicMinuteCounter = 0;
@@ -1481,7 +1610,5 @@ void drawCustomBitmapCreature(const uint8_t* posXaY, const uint8_t* sprite, uint
 }
 
 void markStateDirty() {
-  // Stub: EEPROM persistence is not enabled in this branch yet.
-  // This function exists to keep patches compatible and will be replaced
-  // by a real "dirty flag" + autosave logic when persistence is implemented.
+  stateDirty = true;
 }
