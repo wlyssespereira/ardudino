@@ -92,6 +92,90 @@ unsigned long lastMinuteTick        = 0;
 const unsigned long minuteInterval  = 1000;
 bool isSleeping                     = false;
 
+// -----------------------------
+// UX FEEDBACK (Toast + Shake + Beeps)
+// -----------------------------
+
+const __FlashStringHelper* toastMsg = nullptr;
+uint8_t toastFramesLeft = 0;
+
+uint8_t shakeFramesLeft = 0;
+
+// Toast: show a short message for N frames (cheap UX feedback)
+void showToast(const __FlashStringHelper* msg, uint8_t frames = 30) {
+  toastMsg = msg;
+  toastFramesLeft = frames;
+}
+
+void updateToast() {
+  if (toastFramesLeft > 0) {
+    toastFramesLeft--;
+    if (toastFramesLeft == 0) {
+      toastMsg = nullptr;
+    }
+  }
+}
+
+void drawToast() {
+  if (toastMsg == nullptr || toastFramesLeft == 0) {
+    return;
+  }
+
+  // Bottom-center, small box. Keep it simple & readable.
+  const uint8_t w = 64;
+  const uint8_t h = 10;
+  const uint8_t x = (arduboy.width() - w) / 2;
+  const uint8_t y = arduboy.height() - h - 1;
+
+  // White box with black text
+  arduboy.fillRect(x, y, w, h, WHITE);
+  arduboy.drawRect(x, y, w, h, BLACK);
+
+  arduboy.setTextColor(BLACK);
+  arduboy.setCursor(x + 4, y + 2);
+  arduboy.print(toastMsg);
+  arduboy.setTextColor(WHITE);
+}
+
+// Shake: quick 1px wobble for the currently selected icon
+void startIconShake(uint8_t frames = 10) {
+  shakeFramesLeft = frames;
+}
+
+// Beeps: consistent patterns
+void beepOnce(uint16_t freq, uint16_t durMs) {
+  tone(5, freq, durMs);
+  delay(10);
+}
+
+void beepNav() {
+  beepOnce(1200, 30);
+}
+
+void beepOk() {
+  beepOnce(1400, 25);
+  beepOnce(1600, 25);
+}
+
+void beepError() {
+  beepOnce(400, 35);
+  beepOnce(350, 35);
+}
+
+bool canOpenMenu(Menu m) {
+  // While sleeping: only STATUS and LIGHT
+  if (isSleeping && m != STATUS && m != LIGHT) {
+    return false;
+  }
+
+  // Light OFF: only STATUS and LIGHT
+  if (!isLightOn && m != STATUS && m != LIGHT) {
+    return false;
+  }
+
+  return true;
+}
+
 void drawSleepZ(int16_t x, int16_t y, uint16_t timeOffset) {
   uint8_t frame = ((millis() + timeOffset) / 450) % 2;
   int8_t floatY = ((millis() + timeOffset) / 700) % 2;
@@ -131,6 +215,11 @@ void loop() {
 
   updateClock();
   updateSleepEffects();
+
+  updateToast();
+  if (shakeFramesLeft > 0) {
+    shakeFramesLeft--;
+  }
 
   // Clear the screen
   arduboy.clear();
@@ -203,6 +292,8 @@ void loop() {
   // Check if 3 seconds have passed since the last state change and reset the mood.
   resetHumor(currentTime);
 
+  drawToast();
+
   arduboy.display();
 }
 
@@ -263,7 +354,7 @@ void executeControls() {
       else idx--;
 
       currentMenu = onLeftSide ? (Menu)idx : (Menu)(half + idx);
-      emitBeep();
+      beepNav();
     }
 
     // DOWN = next item in the same side
@@ -271,30 +362,42 @@ void executeControls() {
       idx = (idx + 1) % half;
 
       currentMenu = onLeftSide ? (Menu)idx : (Menu)(half + idx);
-      emitBeep();
+      beepNav();
     }
 
     // RIGHT = go to right side (keep idx)
     if (arduboy.justPressed(RIGHT_BUTTON) && onLeftSide) {
       currentMenu = (Menu)(half + idx);
-      emitBeep();
+      beepNav();
     }
 
     // LEFT = go to left side (keep idx)
     if (arduboy.justPressed(LEFT_BUTTON) && !onLeftSide) {
       currentMenu = (Menu)idx;
-      emitBeep();
+      beepNav();
     }
   }
 
   // B selects the current menu.
   // When the light is OFF, only Status and Light menus can be opened.
   if (arduboy.justPressed(B_BUTTON)) {
-    if (!isLightOn && currentMenu != STATUS && currentMenu != LIGHT) {
-      emitBeep();
+    if (!canOpenMenu(currentMenu)) {
+      // Feedback: message + error beep + icon shake
+      if (isSleeping) {
+        showToast(F("Sleeping"), 35);
+      } else if (!isLightOn) {
+        showToast(F("Too dark"), 35);
+      } else {
+        showToast(F("Blocked"), 35);
+      }
+
+      beepError();
+      startIconShake(12);
       return;
     }
+
     isMenuSelected = true;
+    beepOk();
   }
 
   // A is the global back/cancel.
@@ -860,7 +963,7 @@ void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectH
     if (!sick) {
       // Healing has no effect when the creature is not sick.
       humorCreature = NEGATIVE;
-      emitBeep();
+      beepNav();
       return;
     }
 
@@ -947,10 +1050,10 @@ void navigateSelectedLunch() {
   }
   if (arduboy.justPressed(DOWN_BUTTON)) {
       selectedLunch = (selectedLunch == NO_LUNCH - 1) ? HAMBURGER : selectedLunch + 1;
-      emitBeep();
+      beepNav();
   } else if (arduboy.justPressed(UP_BUTTON)) {
       selectedLunch = (selectedLunch == HAMBURGER) ? NO_LUNCH - 1 : selectedLunch - 1;
-      emitBeep();
+      beepNav();
   }
 }
 
@@ -965,10 +1068,10 @@ void navigateSelectedPlay() {
   }
   if (arduboy.justPressed(DOWN_BUTTON)) {
       selectedPlay = (selectedPlay == SCISSORS) ? ROCK : (SelectedPlay)(selectedPlay + 1);
-      emitBeep();
+      beepNav();
   } else if (arduboy.justPressed(UP_BUTTON)) {
       selectedPlay = (selectedPlay == ROCK) ? SCISSORS : (SelectedPlay)(selectedPlay - 1);
-      emitBeep();
+      beepNav();
   }
 }
 
@@ -979,10 +1082,10 @@ void navigateSelectedStatus() {
   }
   if (arduboy.justPressed(DOWN_BUTTON)) {
       selectedStatus = (selectedStatus == NO_STATUS - 1) ? HAPPINESS : selectedStatus + 1;
-      emitBeep();
+      beepNav();
   } else if (arduboy.justPressed(UP_BUTTON)) {
       selectedStatus = (selectedStatus == HAPPINESS) ? NO_STATUS - 1 : selectedStatus - 1;
-      emitBeep();
+      beepNav();
   }
 }
 
@@ -992,7 +1095,7 @@ void navigateSelectedClimate() {
   }
   if (arduboy.justPressed(DOWN_BUTTON) || arduboy.justPressed(UP_BUTTON)) {
     selectedClimate = (selectedClimate == CLIMATE_COOL) ? CLIMATE_WARM : CLIMATE_COOL;
-    emitBeep();
+    beepNav();
   }
 }
 
@@ -1003,10 +1106,10 @@ void navigateLightSwitches() {
     }
     if (arduboy.justPressed(DOWN_BUTTON)) {
         selectedSwitch = (selectedSwitch == MENU_TURN_ON) ? MENU_TURN_OFF : MENU_TURN_ON;
-        emitBeep();
+        beepNav();
     } else if (arduboy.justPressed(UP_BUTTON)) {
         selectedSwitch = (selectedSwitch == MENU_TURN_ON) ? MENU_TURN_OFF : MENU_TURN_ON;
-        emitBeep();
+        beepNav();
     }
 }
 
@@ -1017,10 +1120,10 @@ void navigateLunches() {
     }
     if (arduboy.justPressed(DOWN_BUTTON)) {
         selectedSwitch = (selectedSwitch == MENU_TURN_ON) ? MENU_TURN_OFF : MENU_TURN_ON;
-        emitBeep();
+        beepNav();
     } else if (arduboy.justPressed(UP_BUTTON)) {
         selectedSwitch = (selectedSwitch == MENU_TURN_ON) ? MENU_TURN_OFF : MENU_TURN_ON;
-        emitBeep();
+        beepNav();
     }
 }
 
@@ -1231,13 +1334,19 @@ void drawMenuIcons(uint8_t x, uint8_t numIcons, uint8_t startMenu) {
     Menu menu = static_cast<Menu>(startMenu + i);
 
     // Draw the outline around the selected icon
+    int8_t shakeX = 0;
+    if (currentMenu == menu && shakeFramesLeft > 0) {
+      shakeX = (shakeFramesLeft & 1) ? 1 : -1;
+    }
+
     if (currentMenu == menu) {
-      arduboy.drawRect(x, iconYOffset + i * iconSpacing - 2, iconWidth + 4, iconHeight + 4, WHITE);
+      arduboy.drawRect(x + shakeX, iconYOffset + i * iconSpacing - 2, iconWidth + 4, iconHeight + 4, WHITE);
     }
 
     // Draw the icons
     arduboy.setCursor(x + 4, iconYOffset + i * iconSpacing + 4);
-    drawCustomBitmap(x, iconYOffset + i * iconSpacing, menuSprites[menu], iconWidth, iconHeight);
+    drawCustomBitmap(x + shakeX, iconYOffset + i * iconSpacing, menuSprites[menu], iconWidth, iconHeight);
+
   }
 }
 
