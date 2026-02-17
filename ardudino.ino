@@ -115,6 +115,11 @@ uint8_t playerWins  = 0;
 uint8_t dinoWins    = 0;
 int8_t lastPlayResult = 0;
 
+// Result screen timing for Play (RPS)
+static const uint16_t kPlayResultScreenMs = 1500;
+uint32_t playFinishedAtMs = 0;
+bool playResultApplied = false;
+
 bool isStartScreen      = true;
 bool isControlsBlocked  = false;
 bool isBackDinoBlocked  = false; // Kept for backwards compatibility; no longer used by Play.
@@ -788,6 +793,14 @@ void drawPlayMenu(uint8_t x, uint8_t y) {
   arduboy.setCursor(x, y);
   if (!playInProgress && !playFinished) {
     arduboy.print(F("B Start"));
+  } else if (playFinished) {
+    if (playerWins > dinoWins) {
+      arduboy.print(F("You Win!"));
+    } else if (dinoWins > playerWins) {
+      arduboy.print(F("You Lose"));
+    } else {
+      arduboy.print(F("Draw"));
+    }
   } else {
     arduboy.print(F("Round "));
     arduboy.print(playRound);
@@ -826,6 +839,14 @@ void drawPlayMenu(uint8_t x, uint8_t y) {
   arduboy.print(F("  L "));
   arduboy.print(dinoWins);
 
+  // Auto-exit after showing result
+  if (playFinished) {
+    if ((uint32_t)(millis() - playFinishedAtMs) >= kPlayResultScreenMs) {
+      resetPlayStateAndExitMenu();
+    }
+    return;
+  }
+
   // Input
   if (arduboy.justPressed(B_BUTTON)) {
     if (!playInProgress && !playFinished) {
@@ -833,28 +854,9 @@ void drawPlayMenu(uint8_t x, uint8_t y) {
       advancePlayRound();
     } else if (playInProgress) {
       advancePlayRound();
-    } else if (playFinished) {
-      // Apply mood/result once when leaving.
-      if (dinoWins > playerWins) {
-        if (happiness < 4) happiness++;
-        humorCreature = POSITIVE;
-      } else if (playerWins > dinoWins) {
-        if (happiness > 0) happiness--;
-        humorCreature = NEGATIVE;
-      } else {
-        humorCreature = NONE;
-      }
-
-      // Reset play state and exit.
-      playInProgress = false;
-      playFinished = false;
-      playRound = 0;
-      playerWins = 0;
-      dinoWins = 0;
-      selectedDinoPlay = NONE_PLAY;
-      isMenuSelected = false;
     }
   }
+
 }
 
 void startPlayIfNeeded() {
@@ -866,6 +868,43 @@ void startPlayIfNeeded() {
   selectedDinoPlay = NONE_PLAY;
 }
 
+
+void applyPlayOutcomeOnce() {
+  if (playResultApplied) return;
+  playResultApplied = true;
+
+  // Apply mood/result once when the game finishes.
+  if (dinoWins > playerWins) {
+    if (happiness < 4) happiness++;
+    humorCreature = POSITIVE;
+  } else if (playerWins > dinoWins) {
+    if (happiness > 0) happiness--;
+    humorCreature = NEGATIVE;
+  } else {
+    humorCreature = NONE;
+  }
+
+  previousTime = millis();
+  isControlsBlocked = true;
+
+  markStateDirty();
+}
+
+void resetPlayStateAndExitMenu() {
+  playInProgress = false;
+  playFinished = false;
+  playRound = 0;
+  playerWins = 0;
+  dinoWins = 0;
+  lastPlayResult = 0;
+  selectedDinoPlay = NONE_PLAY;
+
+  playFinishedAtMs = 0;
+  playResultApplied = false;
+
+  // Back to icon navigation
+  isMenuSelected = false;
+}
 void advancePlayRound() {
   if (!playInProgress) {
     return;
@@ -891,6 +930,10 @@ void advancePlayRound() {
   if (playRound >= kPlayTotalRounds) {
     playInProgress = false;
     playFinished = true;
+
+    playFinishedAtMs = millis();
+    playResultApplied = false;
+    applyPlayOutcomeOnce();
   }
 }
 
