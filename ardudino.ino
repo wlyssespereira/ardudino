@@ -76,11 +76,11 @@ unsigned long lastFrameTime        = 0;
 unsigned long previousTime;
 
 // Creature status
-uint8_t happiness       = 1;  // Sprite
-uint8_t education       = 1;  // Sprite
-uint8_t hunger          = 1;  // Sprite
-uint8_t thirst          = 1;  // Sprite
-uint8_t weight          = 1;  // Text
+uint8_t happiness       = 2;  // Sprite
+uint8_t education       = 2;  // Sprite
+uint8_t hunger          = 2;  // Sprite
+uint8_t thirst          = 2;  // Sprite
+uint8_t weight          = 2;  // Text
 uint8_t age             = 0;  // Text
 uint8_t temperature     = 25; // Text
 
@@ -92,8 +92,7 @@ static const uint8_t kStatMin = 0;
 static const uint8_t kStatMax = 4;
 
 // Every N in-game minutes, apply "metabolism" once.
-// With your default clock (1s = 1 minute), 15 means ~15 seconds real time.
-static const uint8_t kMetabolismIntervalMinutes = 15;
+static const uint8_t kMetabolismIntervalMinutes = 120;
 
 // Helpers (cheap + safe)
 inline void decClamp(uint8_t &v) { if (v > kStatMin) v--; }
@@ -334,6 +333,11 @@ bool canOpenMenu(Menu m) {
 
   // Light OFF: only STATUS and LIGHT
   if (!isLightOn && m != STATUS && m != LIGHT) {
+    return false;
+  }
+
+  // Heal: only when sick
+  if (m == HEAL && !isCreatureSick()) {
     return false;
   }
 
@@ -591,6 +595,8 @@ void executeControls() {
         showToast(F("Sleeping"), 35);
       } else if (!isLightOn) {
         showToast(F("Too dark"), 35);
+      } else if (currentMenu == HEAL && !isCreatureSick()) {
+        showToast(F("Not sick"), 35);
       } else {
         showToast(F("Blocked"), 35);
       }
@@ -599,7 +605,6 @@ void executeControls() {
       startIconShake(12);
       return;
     }
-
     isMenuSelected = true;
     beepOk();
   }
