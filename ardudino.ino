@@ -60,6 +60,28 @@ uint8_t weight          = 1;  // Text
 uint8_t age             = 0;  // Text
 uint8_t temperature     = 25; // Text
 
+// -----------------------------
+// PATCH 2: Metabolism / pacing
+// -----------------------------
+
+static const uint8_t kStatMin = 0;
+static const uint8_t kStatMax = 4;
+
+// Every N in-game minutes, apply "metabolism" once.
+// With your default clock (1s = 1 minute), 15 means ~15 seconds real time.
+static const uint8_t kMetabolismIntervalMinutes = 15;
+
+// Helpers (cheap + safe)
+inline void decClamp(uint8_t &v) { if (v > kStatMin) v--; }
+inline void incClamp(uint8_t &v) { if (v < kStatMax) v++; }
+
+void clampCoreStats() {
+  if (hunger > kStatMax) hunger = kStatMax;
+  if (thirst > kStatMax) thirst = kStatMax;
+  if (happiness > kStatMax) happiness = kStatMax;
+  if (education > kStatMax) education = kStatMax;
+}
+
 // Rock / Paper / Scissors (Play) state.
 static const uint8_t kPlayTotalRounds = 5;
 bool playInProgress = false;
@@ -86,7 +108,7 @@ bool isHealing          = false;
 // -----------------------------
 // GAME CLOCK
 // -----------------------------
-uint8_t gameHour                    = 0;
+uint8_t gameHour                    = 12;
 uint8_t gameMinute                  = 0;
 unsigned long lastMinuteTick        = 0;
 const unsigned long minuteInterval  = 1000;
@@ -311,12 +333,36 @@ void updateClock() {
 
     gameMinute++;
 
+    // PATCH 2: Metabolism tick each N in-game minutes
+    static uint8_t metabolicMinuteCounter = 0;
+    metabolicMinuteCounter++;
+    if (metabolicMinuteCounter >= kMetabolismIntervalMinutes) {
+      metabolicMinuteCounter = 0;
+      // Avoid stacking with sleep effects: if sleeping, let sleep system dominate
+      if (!isSleeping) {
+        updateMetabolismTick();
+      }
+    }
+
     if (gameMinute >= 60) {
       gameMinute = 0;
       gameHour++;
 
+      // PATCH 2: Hourly temperature drift (very light)
+      // Keep it subtle; no new UI needed
+      if (random(100) < 35) { // 35% chance each in-game hour
+        int8_t delta = (random(2) == 0) ? -1 : 1;
+        int16_t t = (int16_t)temperature + delta;
+        if (t < 10) t = 10;
+        if (t > 40) t = 40;
+        temperature = (uint8_t)t;
+      }
+
       if (gameHour >= 24) {
         gameHour = 0;
+
+        // PATCH 2: Age increases once per day
+        if (age < 255) age++;
       }
     }
 
@@ -328,6 +374,7 @@ void updateClock() {
     if (gameHour >= 9) {
       isSleeping = false;
     }
+
   }
 }
 
@@ -987,22 +1034,56 @@ void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectH
   }
 }
 
+void updateMetabolismTick() {
+  // This runs at most once per N in-game minutes (see updateClock()).
+  // Keep it simple and deterministic.
+
+  // Thirst decays faster
+  decClamp(thirst);
+
+  // Hunger decays slower (every other metabolism tick)
+  static uint8_t hungerEveryOther = 0;
+  hungerEveryOther ^= 1;
+  if (hungerEveryOther) {
+    decClamp(hunger);
+  }
+
+  // Happiness penalty if basic needs are empty
+  if ((hunger == 0 || thirst == 0) && happiness > 0) {
+    happiness--;
+  }
+
+  // Weight is slow-changing (cheap, optional flavor)
+  // Overfed sometimes -> gain weight; starving sometimes -> lose weight
+  if (hunger == kStatMax) {
+    if (random(100) < 20) { // 20% chance per metabolism tick
+      if (weight < 250) weight++;
+    }
+  } else if (hunger == 0) {
+    if (random(100) < 25) {
+      if (weight > 0) weight--;
+    }
+  }
+
+  clampCoreStats();
+}
+
 void updateSleepEffects() {
 
   if (!isSleeping) return;
 
   static unsigned long lastSleepTick = 0;
 
-  if (millis() - lastSleepTick >= 2000) { // each 2 seconds
+  if (millis() - lastSleepTick >= 3000) { // each 3 seconds
     lastSleepTick = millis();
 
     if (!isLightOn) {
       // Sleeping in dark = better
       if (happiness < 4) happiness++;
     } else {
-      // Sleeping in clear = worst
-      if (hunger > 0) hunger--;
-      if (thirst > 0) thirst--;
+      // Sleeping with lights ON = worse
+      if (random(100) < 70) { if (hunger > 0) hunger--; }
+      if (random(100) < 85) { if (thirst > 0) thirst--; }
       if (happiness > 0) happiness--;
     }
   }
