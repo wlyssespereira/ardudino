@@ -310,6 +310,10 @@ void beepError() {
   beepOnce(350, 35);
 }
 
+bool isActionRunning() {
+  return isControlsBlocked;
+}
+
 bool canOpenMenu(Menu m) {
   // While sleeping: only STATUS and LIGHT
   if (isSleeping && m != STATUS && m != LIGHT) {
@@ -509,7 +513,18 @@ void updateClock() {
 
 // Function to execute the controls.
 void executeControls() {
-  if(isControlsBlocked) {
+  // While an action animation is running, block input but show feedback
+  if (isActionRunning()) {
+    if (arduboy.justPressed(UP_BUTTON) ||
+        arduboy.justPressed(DOWN_BUTTON) ||
+        arduboy.justPressed(LEFT_BUTTON) ||
+        arduboy.justPressed(RIGHT_BUTTON) ||
+        arduboy.justPressed(A_BUTTON) ||
+        arduboy.justPressed(B_BUTTON)) {
+
+      showToast(F("Busy"), 20);
+      beepError();
+    }
     return;
   }
 
