@@ -36,6 +36,8 @@ SelectedStatus     selectedStatus     = HAPPINESS;
 SelectedPlay       selectedPlay       = ROCK;
 SelectedPlay       selectedDinoPlay   = NONE_PLAY;
 
+SelectedLunch eatingLunch             = HAMBURGER;
+
 // Climate selection inside the Climate menu.
 enum SelectedClimate {
   CLIMATE_COOL,
@@ -62,11 +64,11 @@ const uint8_t spriteWidth           = 8;            // Width of the sprite
 const uint8_t spriteHeight          = 8;            // Height of the sprite
 const uint8_t creatureFrameDuration = 10;           // Duration of each frame in update frames
 const unsigned long frameDuration   = 1000;         // One second
-const unsigned long humorDuration   = 10000;
+const unsigned long humorDuration   = 2000;
 
 // Calculate the x and y coordinates to center the sprite on the screen
-uint8_t spriteX                    = (arduboy.width() - spriteWidth) / 2;
-uint8_t spriteY                    = (arduboy.height() - spriteHeight) / 2;
+uint8_t spriteX                    = (arduboy.width()   - spriteWidth)  / 2;
+uint8_t spriteY                    = (arduboy.height()  - spriteHeight) / 2;
 
 uint8_t creatureCurrentFrame       = 0;            // Index of the current frame
 uint8_t currentFrame               = 0;
@@ -156,8 +158,13 @@ static const uint16_t kEepromAddr = 0;
 // Autosave throttle (avoid EEPROM wear)
 static const uint32_t kAutosaveIntervalMs = 20000; // 20s
 
-bool stateDirty = false;
+bool stateDirty         = false;
 uint32_t lastAutosaveMs = 0;
+
+bool isEating           = false;
+uint8_t eatStep         = 0;
+uint32_t lastEatFrameMs = 0;
+
 
 uint8_t computeChecksum(const SaveData &d) {
   const uint8_t* p = (const uint8_t*)&d;
@@ -419,10 +426,10 @@ void loop() {
   executeControls();
 
   // Draw the creature in the center of the central rectangle
-  drawCreature(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+  drawCreature      (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
   // Draw the creature's status
-  drawHumorCreature(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+  drawHumorCreature (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
   // Render the clock
   renderClock();
@@ -432,6 +439,7 @@ void loop() {
   drawDrinkWater(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
   drawDoStudy   (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
   drawDoShower  (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
+  drawDoEat     (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
 
   // Update the creature's animation
   unsigned long currentTime = millis();
@@ -617,6 +625,9 @@ void resetHumor(long currentTime) {
     isHealing = false;
     // Unblock controls.
     isControlsBlocked = false;
+    // Eat already done.
+    isEating = false;
+    eatStep = 0;
   }
 }
 
@@ -943,9 +954,32 @@ void drawFoodMenu(uint8_t x, uint8_t y) {
 
   // Confirm
   if (arduboy.justPressed(B_BUTTON)) {
-    applyFoodSelection();
-    isMenuSelected = false;
+    startEating();
   }
+
+}
+
+void startEating() {
+  // If not hungry, reject food immediately.
+  if (hunger >= 4) {
+    humorCreature = NEGATIVE;
+    isMenuSelected = false;
+    return;
+  }
+
+  // Snapshot which food we are eating (so menu navigation won't affect it)
+  eatingLunch = selectedLunch;
+
+  // Start action (same pattern as drink/caress/study/shower)
+  previousTime = millis();
+  isControlsBlocked = true;
+
+  isEating = true;
+  eatStep = 0;
+  lastEatFrameMs = millis();
+
+  humorCreature = POSITIVE;
+  isMenuSelected = false;
 }
 
 void applyFoodSelection() {
@@ -961,7 +995,7 @@ void applyFoodSelection() {
   // Default reaction.
   humorCreature = POSITIVE;
 
-  switch (selectedLunch) {
+  switch (eatingLunch) {
     case HAMBURGER:
       if (hunger < 4) hunger++;
       if (hunger < 4) hunger++;
@@ -1454,6 +1488,54 @@ void drawDoCaress(uint8_t x, uint8_t y) {
   }
 
   humorCreature = POSITIVE;
+  isMenuSelected = false;
+}
+
+void drawDoEat(uint8_t x, uint8_t y) {
+  if (!isEating) {
+    return;
+  }
+
+  // Position overlay near creature (similar to drink)
+  x -= 30;
+  y -= 10 + creatureCurrentFrame;
+
+  // We already have a 2x2 tile layout helper
+  uint8_t creatPosArr[4][2];
+  buildCreatPosArr(x, y, creatPosArr);
+
+  // Draw the selected food (snapshot) as 2x2 tiles
+  for (uint8_t i = 0; i < 4; i++) {
+    drawCustomBitmap(creatPosArr[i], foodSprites[eatingLunch][i], 10, 10);
+  }
+
+  // "Bite" animation: erase vertical slices from right to left
+  // 4 steps -> 0, 4, 8, 12, 16 pixels erased (looks good and cheap)
+  uint8_t erased = eatStep * 4; 
+  if (erased > 16) erased = 16;
+
+  // Combined food block is 16x16 starting at (x,y)
+  if (erased > 0) {
+    arduboy.fillRect(x + (16 - erased), y, erased, 16, BLACK);
+  }
+
+  // Advance animation timing
+  uint32_t now = millis();
+  if (now - lastEatFrameMs >= 180) {
+    lastEatFrameMs = now;
+
+    if (eatStep < 4) {
+      eatStep++;
+    } else {
+      // Finish: apply food effects once
+      applyFoodSelection();
+      markStateDirty();
+
+      // End action
+      isEating = false;
+    }
+  }
+
   isMenuSelected = false;
 }
 

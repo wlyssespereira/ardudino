@@ -4,7 +4,7 @@
 // Constants for creature animation
 const uint8_t creatureSpriteWidth   = 16; // Largura do sprite
 const uint8_t creatureSpriteHeight  = 16; // Altura do sprite
-const uint8_t creatureNumFrames     = 2;  // Número de frames na animação
+const uint8_t creatureNumFrames     = 3;  // Número de frames na animação
 
 enum HumorCreature {
   POSITIVE,
