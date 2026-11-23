@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Local tool copies and generated firmware
+.tools/
+build/
+Ardens.ini
+*.save
+*.snapshot

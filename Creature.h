@@ -20,6 +20,9 @@ enum SelectedStatus {
   WEIGHT,
   AGE,
   TEMPERATURE,
+  HYGIENE,
+  GROWTH,
+  HEALTH,
   NO_STATUS
 };
 
@@ -30,7 +33,10 @@ const char* statusNames[] = {
   "Thirst",
   "Weight",
   "Age",
-  "Temperature"
+  "Temp",
+  "Hygiene",
+  "Growth",
+  "Health"
 };
 
 // https://xantorohara.github.io/led-matrix-editor/

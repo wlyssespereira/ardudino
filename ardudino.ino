@@ -5,8 +5,14 @@
 #include "Creature.h"
 #include "Foods.h"
 #include "Play.h"
+#include "PetCare.h"
+#include "Evolution.h"
 
-struct SaveData {
+#ifdef ARDUDINO_SELF_TEST
+void runSelfTests();
+#endif
+
+struct LegacySaveData {
   uint8_t magic;
   uint8_t version;
 
@@ -25,6 +31,14 @@ struct SaveData {
   uint8_t flags;     // bit0 = lightOn
   uint8_t checksum;  // XOR checksum of all bytes except checksum
 };
+
+struct SaveData {
+  LegacySaveData base;
+  PetCare care;
+  uint8_t checksum;
+};
+
+PetCare petCare;
 
 Arduboy2 arduboy;
 
@@ -132,6 +146,8 @@ bool isInFoodMenu       = false;
 bool isStudying         = false;
 bool isShowering        = false;
 bool isHealing          = false;
+uint8_t pendingButtonPresses = 0;
+uint8_t lastRawButtons = 0;
 
 // -----------------------------
 // GAME CLOCK
@@ -139,7 +155,10 @@ bool isHealing          = false;
 uint8_t gameHour                    = 12;
 uint8_t gameMinute                  = 0;
 unsigned long lastMinuteTick        = 0;
-const unsigned long minuteInterval  = 1000;
+#ifndef ARDUDINO_MINUTE_MS
+#define ARDUDINO_MINUTE_MS 60000UL
+#endif
+const unsigned long minuteInterval = ARDUDINO_MINUTE_MS;
 bool isSleeping                     = false;
 
 // -----------------------------
@@ -155,12 +174,12 @@ uint8_t shakeFramesLeft = 0;
 // -----------------------------
 
 static const uint8_t kSaveMagic   = 0xAD;
-static const uint8_t kSaveVersion = 1;
+static const uint8_t kSaveVersion = 2;
 
-static const uint16_t kEepromAddr = 0;
+static const uint16_t kEepromAddr = EEPROM_STORAGE_SPACE_START;
 
 // Autosave throttle (avoid EEPROM wear)
-static const uint32_t kAutosaveIntervalMs = 20000; // 20s
+static const uint32_t kAutosaveIntervalMs = 300000; // 5 minutes
 
 bool stateDirty         = false;
 uint32_t lastAutosaveMs = 0;
@@ -169,15 +188,52 @@ bool isEating           = false;
 uint8_t eatStep         = 0;
 uint32_t lastEatFrameMs = 0;
 
+#ifdef ARDUDINO_DEMO
+uint8_t demoScenario = 0;
 
-uint8_t computeChecksum(const SaveData &d) {
-  const uint8_t* p = (const uint8_t*)&d;
+void prepareDemoScenario(uint8_t scenario) {
+  if (scenario == 0) return;
+  petCare = PetCare();
+  hunger = thirst = 4;
+  happiness = 3; education = 2; weight = 2; age = 0; temperature = 25;
+  gameHour = 12; gameMinute = 0; isLightOn = true; isSleeping = false;
+  if (scenario >= 2 && scenario <= 4) {
+    age = 5; weight = 12; petCare.species = scenario - 1;
+  } else if (scenario == 5) {
+    petCare.sick = true; petCare.dirt = 3;
+    hunger = thirst = 1; temperature = 32;
+  } else if (scenario == 6) {
+    gameHour = 21; isSleeping = true;
+  }
+  markStateDirty();
+}
+
+void drawDemoScenario() {
+  arduboy.setCursor(2, 55);
+  arduboy.print(F("B: "));
+  switch (demoScenario) {
+    case 0: arduboy.print(F("Continue")); break;
+    case 1: arduboy.print(F("New pet")); break;
+    case 2: arduboy.print(F("T-Rex")); break;
+    case 3: arduboy.print(F("Bronto")); break;
+    case 4: arduboy.print(F("Tricera")); break;
+    case 5: arduboy.print(F("Needs care")); break;
+    case 6: arduboy.print(F("Bedtime")); break;
+  }
+}
+#endif
+
+
+uint8_t checksumBytes(const uint8_t* p, uint16_t size) {
   uint8_t x = 0;
-  // checksum excludes last byte (checksum itself)
-  for (uint16_t i = 0; i < sizeof(SaveData) - 1; i++) {
+  for (uint16_t i = 0; i < size; i++) {
     x ^= p[i];
   }
   return x;
+}
+
+uint8_t computeChecksum(const SaveData &d) {
+  return checksumBytes((const uint8_t*)&d, sizeof(d) - 1);
 }
 
 void eepromWriteUpdate(uint16_t addr, const uint8_t* data, uint16_t len) {
@@ -187,12 +243,28 @@ void eepromWriteUpdate(uint16_t addr, const uint8_t* data, uint16_t len) {
 }
 
 bool loadState() {
-  SaveData d;
-  EEPROM.get(kEepromAddr, d);
-
-  if (d.magic != kSaveMagic) return false;
-  if (d.version != kSaveVersion) return false;
-  if (computeChecksum(d) != d.checksum) return false;
+  SaveData saved;
+  EEPROM.get(kEepromAddr, saved);
+  LegacySaveData d;
+  PetCare loadedCare;
+  if (saved.base.magic == kSaveMagic && saved.base.version == kSaveVersion &&
+      computeChecksum(saved) == saved.checksum) {
+    d = saved.base;
+    loadedCare = saved.care;
+    if (loadedCare.species > TRICERA || loadedCare.dirt > 3 ||
+        loadedCare.neglect > 3 || loadedCare.metabolicMinutes >= 120 ||
+        loadedCare.metabolicPhase > 1) return false;
+  } else {
+    if (saved.base.magic == kSaveMagic && saved.base.version == kSaveVersion)
+      return false; // A damaged current save must not resurrect an old v1 pet.
+    // Read v1 once from its historical address; never write system bytes.
+    EEPROM.get(0, d);
+    if (d.magic != kSaveMagic || d.version != 1 ||
+        checksumBytes((const uint8_t*)&d, sizeof(d) - 1) != d.checksum)
+      return false;
+  }
+  if (d.hour >= 24 || d.minute >= 60) return false;
+  petCare = loadedCare;
 
   hunger      = d.hunger;
   thirst      = d.thirst;
@@ -214,17 +286,19 @@ bool loadState() {
   if (temperature > 40) temperature = 40;
 
   // Recompute sleep state based on schedule
-  isSleeping = (gameHour < 9);
+  isSleeping = isBedtime(gameHour);
 
   // Avoid instant clock tick after load
   lastMinuteTick = millis();
 
-  stateDirty = false;
+  evolvePet(petCare, age);
+  stateDirty = d.version == 1;
   return true;
 }
 
 void saveState() {
-  SaveData d;
+  SaveData saved = {};
+  LegacySaveData &d = saved.base;
   d.magic   = kSaveMagic;
   d.version = kSaveVersion;
 
@@ -243,9 +317,10 @@ void saveState() {
   d.flags = 0;
   if (isLightOn) d.flags |= 0x01;
 
-  d.checksum = computeChecksum(d);
+  saved.care = petCare;
+  saved.checksum = computeChecksum(saved);
 
-  eepromWriteUpdate(kEepromAddr, (const uint8_t*)&d, sizeof(SaveData));
+  eepromWriteUpdate(kEepromAddr, (const uint8_t*)&saved, sizeof(saved));
 
   stateDirty = false;
   lastAutosaveMs = millis();
@@ -303,6 +378,7 @@ void startIconShake(uint8_t frames = 10) {
 
 // Beeps: consistent patterns
 void beepOnce(uint16_t freq, uint16_t durMs) {
+  if (!arduboy.audio.enabled()) return;
   tone(5, freq, durMs);
   delay(10);
 }
@@ -355,36 +431,57 @@ void drawSleepZ(int16_t x, int16_t y, uint16_t timeOffset) {
 }
 
 void setup() {
+#ifdef ARDUDINO_SELF_TEST
+  // Headless Ardens has no physical button release phase for begin().
+  arduboy.boot();
+  arduboy.audio.begin();
+#else
   arduboy.begin();
+#endif
   arduboy.setFrameRate(15);
-  randomSeed(millis());
+  arduboy.initRandomSeed();
   previousTime = millis();
   loadState();
+#ifdef ARDUDINO_SELF_TEST
+  runSelfTests();
+#endif
 }
 
 
 void loop() {
+  // Capture short presses even between the 15 FPS drawing frames.
+  uint8_t rawButtons = arduboy.buttonsState();
+  pendingButtonPresses |= rawButtons & ~lastRawButtons;
+  lastRawButtons = rawButtons;
   if (!arduboy.nextFrame()) {
     return;
   }
-  
-  arduboy.pollButtons();
+  arduboy.currentButtonState = rawButtons | pendingButtonPresses;
+  arduboy.previousButtonState = rawButtons & ~pendingButtonPresses;
+  pendingButtonPresses = 0;
 
   if(isStartScreen) {
     arduboy.clear();
     drawStartScreen(rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
     arduboy.setCursor(60, 40);
     arduboy.print(F("Press A..."));
+#ifdef ARDUDINO_DEMO
+    if (arduboy.justPressed(B_BUTTON)) demoScenario = (demoScenario + 1) % 7;
+    drawDemoScenario();
+#endif
     arduboy.display();
-    // Wait until the B button is pressed
-    if (arduboy.pressed(A_BUTTON)) {
+    // Start the game without counting time spent on the title screen.
+    if (arduboy.justPressed(A_BUTTON)) {
+#ifdef ARDUDINO_DEMO
+      prepareDemoScenario(demoScenario);
+#endif
       isStartScreen = false;
+      lastMinuteTick = millis();
     }
     return;
   }
 
   updateClock();
-  updateSleepEffects();
 
   updateToast();
   if (shakeFramesLeft > 0) shakeFramesLeft--;
@@ -421,8 +518,9 @@ void loop() {
     arduboy.fillRect(viewportX, viewportY, viewportW, viewportH, WHITE);
   }
 
-  // Draw a square inside the central rectangle
-  if (isMenuSelected) {
+  bool menuWasSelected = isMenuSelected;
+  // Freeze submenu confirmations and navigation during action animations.
+  if (isMenuSelected && !isActionRunning()) {
     drawSelectedMenu(iconXLeft + 15, centerY - rectHeight / 2 + 3, rectWidth + 10, rectHeight);
     navigateLightSwitches();
     navigateSelectedLunch();
@@ -431,8 +529,11 @@ void loop() {
     navigateSelectedClimate();
   }
 
-  // Execute the controls function
-  executeControls();
+  // A confirmation can close a submenu: do not process that B edge twice.
+  if (!menuWasSelected) executeControls();
+  else if (arduboy.justPressed(A_BUTTON) && !isActionRunning() &&
+           !(currentMenu == PLAY && (playInProgress || playFinished)))
+    isMenuSelected = false;
 
   // Draw the creature in the center of the central rectangle
   drawCreature      (rectX + (rectWidth - creatureSpriteWidth) / 2, rectY + (rectHeight - creatureSpriteHeight) / 2);
@@ -464,6 +565,7 @@ void loop() {
   resetHumor(currentTime);
 
   drawToast();
+  drawCareAlert();
 
   arduboy.display();
 }
@@ -477,54 +579,38 @@ void renderClock() {
 }
 
 void updateClock() {
-  if (millis() - lastMinuteTick >= minuteInterval) {
-    lastMinuteTick = millis();
-
-    gameMinute++;
-    markStateDirty();
-
-    // PATCH 2: Metabolism tick each N in-game minutes
-    static uint8_t metabolicMinuteCounter = 0;
-    metabolicMinuteCounter++;
-    if (metabolicMinuteCounter >= kMetabolismIntervalMinutes) {
-      metabolicMinuteCounter = 0;
-      // Avoid stacking with sleep effects: if sleeping, let sleep system dominate
-      if (!isSleeping) {
-        updateMetabolismTick();
-      }
-    }
-
-    if (gameMinute >= 60) {
+  uint32_t now = millis();
+  while ((uint32_t)(now - lastMinuteTick) >= minuteInterval) {
+    lastMinuteTick += minuteInterval;
+    bool wasSleeping = isSleeping;
+    if (++gameMinute >= 60) {
       gameMinute = 0;
-      gameHour++;
-
-      // PATCH 2: Hourly temperature drift (very light)
-      // Keep it subtle; no new UI needed
-      if (random(100) < 35) { // 35% chance each in-game hour
-        int8_t delta = (random(2) == 0) ? -1 : 1;
-        int16_t t = (int16_t)temperature + delta;
-        if (t < 10) t = 10;
-        if (t > 40) t = 40;
-        temperature = (uint8_t)t;
-      }
-
-      if (gameHour >= 24) {
+      if (++gameHour >= 24) {
         gameHour = 0;
-
-        // PATCH 2: Age increases once per day
-        if (age < 255) age++;
+        if (age < 255) ++age;
+        uint8_t previousSpecies = petCare.species;
+        evolvePet(petCare, age);
+        if (previousSpecies != petCare.species) showToast(F("Evolved!"), 45);
+      }
+      if (random(100) < 35) {
+        int16_t t = temperature + (random(2) ? 1 : -1);
+        temperature = constrain(t, 10, 40);
       }
     }
-
-    // Sleep schedule
-    if (gameHour < 9) {
-      isSleeping = true;
+    isSleeping = isBedtime(gameHour);
+    if (wasSleeping && !isSleeping) isLightOn = true;
+    // Leave an active menu/minigame cleanly when bedtime arrives.
+    if (!wasSleeping && isSleeping) {
+      resetPlayStateAndExitMenu();
+      showToast(F("Bedtime"), 40);
     }
-
-    if (gameHour >= 9) {
-      isSleeping = false;
+    if (++petCare.metabolicMinutes >= kMetabolismIntervalMinutes) {
+      petCare.metabolicMinutes = 0;
+      if (!isSleeping) updateMetabolismTick();
+      updateSleepEffects();
+      assessCare(petCare, hunger, thirst, temperature, isSleeping, isLightOn);
     }
-
+    markStateDirty();
   }
 }
 
@@ -588,7 +674,7 @@ void executeControls() {
 
   // B selects the current menu.
   // When the light is OFF, only Status and Light menus can be opened.
-  if (arduboy.justPressed(B_BUTTON)) {
+  if (!isMenuSelected && arduboy.justPressed(B_BUTTON)) {
     if (!canOpenMenu(currentMenu)) {
       // Feedback: message + error beep + icon shake
       if (isSleeping) {
@@ -613,12 +699,14 @@ void executeControls() {
   // Exception: Play (RPS) must be finished once started.
   if (arduboy.justPressed(A_BUTTON) && !(currentMenu == PLAY && (playInProgress || playFinished))) {
     isMenuSelected = false;
+    saveState();
+    showToast(F("Saved"), 20);
   }
 }
 
 // Function to reset the mood after a certain duration
-void resetHumor(long currentTime) {
-  if (currentTime - previousTime >= humorDuration) {
+void resetHumor(unsigned long currentTime) {
+  if ((uint32_t)(currentTime - previousTime) >= humorDuration && !isEating) {
     // Toggle the variable state
     humorCreature = NONE;
     // Update the previous time to the current time
@@ -682,6 +770,8 @@ void doCaress() {
   previousTime = millis();
   isControlsBlocked = true;
 
+  incClamp(happiness);
+  markStateDirty();
   isDoingCaress = true;
   humorCreature = POSITIVE;
 }
@@ -698,6 +788,7 @@ void doDrinkingWater() {
   if(thirst < 4) {
     isDrinkingWater = true;
     thirst++;
+    markStateDirty();
     humorCreature = POSITIVE;
   } else {
     humorCreature = NEGATIVE;
@@ -722,6 +813,28 @@ void drawStatusMenu(uint8_t x, uint8_t y) {
 }
 
 void drawStatusByText(uint8_t x, uint8_t y) {
+  if (selectedStatus == HYGIENE || selectedStatus == GROWTH || selectedStatus == HEALTH) {
+    arduboy.setCursor(x + 6, y + 16);
+    if (selectedStatus == HYGIENE) {
+      arduboy.print(petCare.dirt >= 2 ? F("Needs bath") : F("Clean"));
+      arduboy.setCursor(x + 6, y + 28);
+      arduboy.print(F("Dirt ")); arduboy.print(petCare.dirt); arduboy.print(F("/3"));
+    } else if (selectedStatus == HEALTH) {
+      arduboy.print(petCare.sick ? F("Sick") : F("Healthy"));
+      arduboy.setCursor(x + 6, y + 28);
+      arduboy.print(petCare.sick ? F("Use Heal") : F("Keep care"));
+    } else {
+      arduboy.print(age < 2 ? F("Baby") : (age < 5 ? F("Young") : F("Adult")));
+      arduboy.setCursor(x + 6, y + 28);
+      switch (petCare.species) {
+        case TREX: arduboy.print(F("T-Rex")); break;
+        case BRONTO: arduboy.print(F("Bronto")); break;
+        case TRICERA: arduboy.print(F("Tricera")); break;
+        default: arduboy.print(F("Diet->Dino")); break;
+      }
+    }
+    return;
+  }
   char text[10];
   switch (selectedStatus) {
       case WEIGHT:
@@ -797,12 +910,12 @@ void drawPlayMenu(uint8_t x, uint8_t y) {
   // Header / round counter
   arduboy.setCursor(x, y);
   if (!playInProgress && !playFinished) {
-    arduboy.print(F("B Start"));
+    arduboy.print(F("Let me win"));
   } else if (playFinished) {
     if (playerWins > dinoWins) {
-      arduboy.print(F("You Win!"));
+      arduboy.print(F("Try again"));
     } else if (dinoWins > playerWins) {
-      arduboy.print(F("You Lose"));
+      arduboy.print(dinoWins >= 3 ? F("Dino happy") : F("Try again"));
     } else {
       arduboy.print(F("Draw"));
     }
@@ -815,9 +928,11 @@ void drawPlayMenu(uint8_t x, uint8_t y) {
 
   // Labels
   arduboy.setCursor(x, y + 10);
-  arduboy.print(F("You"));
+  arduboy.print(F("Y"));
+  arduboy.print(playerWins);
   arduboy.setCursor(x + 44, y + 10);
-  arduboy.print(F("Dino"));
+  arduboy.print(F("D"));
+  arduboy.print(dinoWins);
 
   // Draw player move
   uint8_t creatPosArr[4][2];
@@ -836,13 +951,6 @@ void drawPlayMenu(uint8_t x, uint8_t y) {
       drawCustomBitmap(creatPosArr[i], playSprites[selectedDinoPlay][i], 10, 10);
     }
   }
-
-  // Scoreboard
-  arduboy.setCursor(x, y + 52);
-  arduboy.print(F("W "));
-  arduboy.print(playerWins);
-  arduboy.print(F("  L "));
-  arduboy.print(dinoWins);
 
   // Auto-exit after showing result
   if (playFinished) {
@@ -879,7 +987,7 @@ void applyPlayOutcomeOnce() {
   playResultApplied = true;
 
   // Apply mood/result once when the game finishes.
-  if (dinoWins > playerWins) {
+  if (dinoWins >= 3) {
     if (happiness < 4) happiness++;
     humorCreature = POSITIVE;
   } else if (playerWins > dinoWins) {
@@ -1033,48 +1141,19 @@ void startEating() {
 void applyFoodSelection() {
   previousTime = millis();
   isControlsBlocked = true;
-
-  // If not hungry, reject food.
   if (hunger >= 4) {
     humorCreature = NEGATIVE;
     return;
   }
-
-  // Default reaction.
   humorCreature = POSITIVE;
-
-  switch (eatingLunch) {
-    case HAMBURGER:
-      if (hunger < 4) hunger++;
-      if (hunger < 4) hunger++;
-      if (happiness < 4) happiness++;
-      break;
-    case MEAT:
-      if (hunger < 4) hunger++;
-      if (hunger < 4) hunger++;
-      break;
-    case VEGGIES:
-      if (hunger < 4) hunger++;
-      if (happiness > 0) happiness--;
-      break;
-    case FRUIT:
-      if (hunger < 4) hunger++;
-      if (happiness < 4) happiness++;
-      break;
-    case PASTA:
-      if (hunger < 4) hunger++;
-      if (hunger < 4) hunger++;
-      break;
-    case ICECREAM:
-      if (hunger < 4) hunger++;
-      if (happiness < 4) happiness++;
-      if (happiness < 4) happiness++;
-      break;
-    default:
-      // Unknown food; do nothing.
-      humorCreature = NONE;
-      break;
-  }
+  incClamp(hunger);
+  if (eatingLunch == MEAT || eatingLunch == VEGGIES) incClamp(hunger);
+  if (eatingLunch == HAMBURGER || eatingLunch == MEAT) recordMeal(petCare, 0);
+  else if (eatingLunch == VEGGIES || eatingLunch == FRUIT) recordMeal(petCare, 1);
+  else if (eatingLunch == PASTA) recordMeal(petCare, 2);
+  if (eatingLunch == ICECREAM || eatingLunch == FRUIT) incClamp(happiness);
+  if (weight < 250) ++weight;
+  markStateDirty();
 }
 
 // Study menu: increases education, may reduce happiness a bit.
@@ -1100,6 +1179,7 @@ void drawStudyMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rect
 
     if (education < 4) {
       education++;
+      markStateDirty();
       // Studying is good, but can be boring.
       if (happiness > 0 && random(100) < 40) {
         happiness--;
@@ -1113,7 +1193,7 @@ void drawStudyMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rect
   }
 }
 
-// Shower menu: small happiness boost.
+// Shower removes dirt; affection is a separate action.
 void drawShowerMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
   (void)rectWidth;
   (void)rectHeight;
@@ -1124,7 +1204,7 @@ void drawShowerMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rec
   arduboy.setCursor(x, y);
   arduboy.print(F("B Shower"));
   arduboy.setCursor(x, y + 12);
-  arduboy.print(F("Happy +1"));
+  arduboy.print(F("Wash dirt"));
 
   if (arduboy.justPressed(B_BUTTON)) {
     if (isShowering) {
@@ -1133,6 +1213,9 @@ void drawShowerMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rec
     isShowering = true;
     previousTime = millis();
     isControlsBlocked = true;
+
+    petCare.dirt = 0;
+    markStateDirty();
 
     if (happiness < 4) {
       happiness++;
@@ -1183,27 +1266,14 @@ void drawClimateMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t re
       if (temperature < 40) temperature++;
     }
 
+    markStateDirty();
     humorCreature = POSITIVE;
     isMenuSelected = false;
   }
 }
 
-// Heal menu: converts happiness loss from low stats into a small recovery.
-// Returns true if the creature is currently sick.
-// This is a lightweight rule-based check that relies on existing stats (no new persistent state).
-bool isCreatureSick() {
-  // Temperature out of the comfort range makes the creature sick.
-  if (temperature <= 14 || temperature >= 32) {
-    return true;
-  }
-
-  // Being very hungry or very thirsty also makes the creature sick.
-  if (hunger <= 1 || thirst <= 1) {
-    return true;
-  }
-
-  return false;
-}
+// Medicine cures illness; its environmental causes still require care.
+bool isCreatureSick() { return petCare.sick; }
 
 void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectHeight) {
   (void)rectWidth;
@@ -1219,7 +1289,7 @@ void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectH
 
   arduboy.setCursor(x, y + 12);
   if (sick) {
-    arduboy.print(F("Happy +1"));
+    arduboy.print(F("Medicine"));
   } else {
     arduboy.print(F("Not sick"));
   }
@@ -1240,18 +1310,9 @@ void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectH
       return;
     }
 
-    // Apply heal effects only when sick.
-    if (happiness < 4) {
-      happiness++;
-    }
-
-    // Push temperature back toward a safe default.
-    const uint8_t targetTemp = 22;
-    if (temperature < targetTemp) {
-      temperature = (uint8_t)min((int)temperature + 2, (int)targetTemp);
-    } else if (temperature > targetTemp) {
-      temperature = (uint8_t)max((int)temperature - 2, (int)targetTemp);
-    }
+    petCare.sick = false;
+    petCare.neglect = 0;
+    showToast(F("Healed"), 35);
 
     humorCreature = POSITIVE;
 
@@ -1261,58 +1322,21 @@ void drawHealMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rectH
 }
 
 void updateMetabolismTick() {
-  // This runs at most once per N in-game minutes (see updateClock()).
-  // Keep it simple and deterministic.
-
-  // Thirst decays faster
   decClamp(thirst);
-
-  // Hunger decays slower (every other metabolism tick)
-  static uint8_t hungerEveryOther = 0;
-  hungerEveryOther ^= 1;
-  if (hungerEveryOther) {
-    decClamp(hunger);
-  }
-
-  // Happiness penalty if basic needs are empty
-  if ((hunger == 0 || thirst == 0) && happiness > 0) {
-    happiness--;
-  }
-
-  // Weight is slow-changing (cheap, optional flavor)
-  // Overfed sometimes -> gain weight; starving sometimes -> lose weight
-  if (hunger == kStatMax) {
-    if (random(100) < 20) { // 20% chance per metabolism tick
-      if (weight < 250) weight++;
-    }
-  } else if (hunger == 0) {
-    if (random(100) < 25) {
-      if (weight > 0) weight--;
-    }
-  }
-
+  petCare.metabolicPhase ^= 1;
+  if (petCare.metabolicPhase || age < 2) decClamp(hunger);
+  if (petCare.dirt < 3) ++petCare.dirt;
+  if (hunger == 0 || thirst == 0 || petCare.dirt == 3) decClamp(happiness);
+  if (hunger >= 3 && weight < 250) ++weight;
+  else if (hunger == 0 && weight > 1) --weight;
   clampCoreStats();
 }
 
 void updateSleepEffects() {
-
   if (!isSleeping) return;
-
-  static unsigned long lastSleepTick = 0;
-
-  if (millis() - lastSleepTick >= 3000) { // each 3 seconds
-    lastSleepTick = millis();
-
-    if (!isLightOn) {
-      // Sleeping in dark = better
-      if (happiness < 4) happiness++;
-    } else {
-      // Sleeping with lights ON = worse
-      if (random(100) < 70) { if (hunger > 0) hunger--; }
-      if (random(100) < 85) { if (thirst > 0) thirst--; }
-      if (happiness > 0) happiness--;
-    }
-  }
+  // Same two-hour cadence as care: never drain needs every few seconds.
+  if (isLightOn) decClamp(happiness);
+  else incClamp(happiness);
 }
 
 // Function to draw the light menu
@@ -1342,7 +1366,7 @@ void drawLightMenu(uint8_t rectX, uint8_t rectY, uint8_t rectWidth, uint8_t rect
     } else {
       isLightOn = false;
     }
-    arduboy.pollButtons();
+    markStateDirty();
     isMenuSelected = false;
   }
   if(arduboy.justPressed(A_BUTTON)) {
@@ -1486,9 +1510,9 @@ void drawCreature(uint8_t x, uint8_t y) {
   if (isSleeping) {
     uint8_t sleepFrame = (millis() / 500) % 2;
 
-    for (uint8_t i = 0; i < 4; i++) {
+    if (petCare.species != BABY) drawEvolvedCreature(x, y);
+    else for (uint8_t i = 0; i < 4; i++)
       drawCustomBitmapCreature(creatPosArr[i], sleepMatSprites[sleepFrame][i], 10, 10);
-    }
 
     // optional: draw a small "Z" floating (see below)
     drawSleepZ(x + 18, y - 4, 0);
@@ -1498,7 +1522,59 @@ void drawCreature(uint8_t x, uint8_t y) {
   }
 
   for (uint8_t i = 0; i < 4; i++) {
-    drawCustomBitmapCreature(creatPosArr[i] , creatureMatSprites[creatureCurrentFrame][i], 10, 10);
+    if (petCare.species == BABY)
+      drawCustomBitmapCreature(creatPosArr[i], creatureMatSprites[creatureCurrentFrame][i], 10, 10);
+  }
+  if (petCare.species != BABY) drawEvolvedCreature(x, y);
+  if (petCare.dirt >= 2) {
+    const uint8_t ink = isLightOn ? WHITE : BLACK;
+    arduboy.drawPixel(x - 3, y + 5, ink);
+    arduboy.drawPixel(x + 20, y + 10, ink);
+    arduboy.fillRect(x + 19, y + 19, 5, 2, ink);
+    arduboy.fillRect(x + 20, y + 17, 3, 2, ink);
+  }
+  if (petCare.sick) {
+    const uint8_t ink = isLightOn ? WHITE : BLACK;
+    arduboy.drawFastHLine(x + 24, y + 2, 7, ink);
+    arduboy.drawFastVLine(x + 27, y - 1, 7, ink);
+  }
+}
+
+void drawEvolvedCreature(uint8_t x, uint8_t y) {
+  const uint8_t ink = isLightOn ? WHITE : BLACK;
+  uint8_t bob = !isSleeping && creatureCurrentFrame == 1 ? 1 : 0;
+  for (uint8_t row = 0; row < 16; ++row) {
+    uint16_t bits = pgm_read_word(&evolvedSprites[petCare.species - 1][row]);
+    for (uint8_t col = 0; col < 16; ++col) {
+      if (bits & (0x8000U >> col)) arduboy.drawPixel(x + col, y + row - bob, ink);
+    }
+  }
+  // Adults gain a tail extension; juveniles keep the compact silhouette.
+  if (age >= 5) {
+    arduboy.drawLine(x, y + 11 - bob, x - 5, y + 7 - bob, ink);
+    arduboy.drawLine(x, y + 12 - bob, x - 5, y + 7 - bob, ink);
+  }
+}
+
+void drawCareAlert() {
+  static uint8_t previousNeed = 0;
+  static uint32_t lastAlertMs = 0;
+  uint8_t need = careNeed(petCare, hunger, thirst, happiness, temperature, isSleeping, isLightOn);
+  if (need && need != previousNeed && (uint32_t)(millis() - lastAlertMs) >= 30000UL) {
+    beepOnce(900, 80);
+    lastAlertMs = millis();
+  }
+  previousNeed = need;
+  if (isMenuSelected || toastFramesLeft || !need) return;
+  arduboy.setCursor(27, 54);
+  switch (need) {
+    case 1: arduboy.print(F("! Lights off")); break;
+    case 2: arduboy.print(F("! Medicine")); break;
+    case 3: arduboy.print(F("! Water")); break;
+    case 4: arduboy.print(F("! Food")); break;
+    case 5: arduboy.print(F("! Bath")); break;
+    case 6: arduboy.print(F("! Climate")); break;
+    case 7: arduboy.print(F("! Play")); break;
   }
 }
 
@@ -1757,3 +1833,7 @@ void drawCustomBitmapCreature(const uint8_t* posXaY, const uint8_t* sprite, uint
 void markStateDirty() {
   stateDirty = true;
 }
+
+#ifdef ARDUDINO_SELF_TEST
+#include "tests/SelfTest.h"
+#endif

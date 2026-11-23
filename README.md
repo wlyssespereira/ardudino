@@ -10,12 +10,17 @@ The game is designed to be **lightweight, easy to understand, and fully compatib
 
 ---
 
+## Testar no emulador
+
+Veja [TESTAR.md](TESTAR.md) para abrir a demo no Ardens, escolher cenários e executar os testes AVR.
+As melhorias implementadas e próximas sugestões estão em [ROADMAP.md](ROADMAP.md).
+
 ## Controls
 
-- **LEFT / RIGHT**: Navigate side menus
-- **UP / DOWN**: Change options inside menus
+- **LEFT / RIGHT**: Switch menu columns
+- **UP / DOWN**: Navigate icons or change submenu options
 - **B**: Confirm / Select
-- **A**: Back / Cancel
+- **A**: Back / Cancel; on the main pet screen, save immediately
 
 ---
 
@@ -66,10 +71,9 @@ Each food affects **hunger** and **happiness** in different ways.
 
 <img src="/assets/menu_light.png" width="300" height="200" />
 
-Turns the light **ON** or **OFF**.
+Turns the light **ON** or **OFF**. Sleep follows the game clock (21:00 to 09:00).
 
 - When the light is OFF:
-  - The creature goes to sleep
   - Most menus are locked
   - Only **Status** and **Light** menus remain accessible
 
@@ -118,7 +122,8 @@ Play a **Rock / Paper / Scissors** minigame against the creature.
 
 - Always played in **5 rounds**
 - Cannot be exited before finishing
-- The result affects the creature’s happiness
+- Let the dino win at least three rounds to increase its happiness
+- Y/D show your wins and the dino’s wins
 
 ---
 
@@ -141,6 +146,7 @@ Teach your creature.
 Give the creature a shower.
 
 - Improves **happiness**
+- Removes accumulated dirt
 - Displays a shower animation
 
 ---
@@ -163,17 +169,17 @@ Adjust the environment temperature.
 Use medicine to heal the creature.
 
 - Only works when the creature is sick
-- Restores happiness and stabilizes temperature
+- Cures illness; food, water, climate and hygiene still need care
 
 ---
 
 ## Health and Sleep
 
-- The creature can become **sick** due to:
-  - Extreme temperature
-  - Hunger or thirst being too low
+- Two consecutive unhealthy two-hour ticks can cause **persistent illness**:
+  - Temperature outside 18–30°C
+  - Empty food or water, maximum dirt, or sleeping with lights on
 - Medicine only works when the creature is sick
-- When the light is OFF, the creature sleeps and recovers passively
+- Sleeping in darkness improves happiness; lights turn on automatically at 09:00
 
 ---
 
@@ -181,9 +187,31 @@ Use medicine to heal the creature.
 
 There is no strict win condition.
 
-The goal is to **keep your creature alive, healthy, and happy for as long as possible**.
+The goal is to **raise a dinosaur and keep it healthy and happy**.
+Death and a new-generation flow are still planned.
 
 ---
+
+## Growth and persistence
+
+Meat/burgers, plants/fruit, and pasta vote for T-Rex, Bronto, and Tricera during the
+baby stage. At age 2, the dominant group locks the species; tied or absent votes
+produce Tricera. Ice cream improves mood without a diet vote. At age 5, the sprite
+gains an adult tail extension. Status includes Hygiene, Growth and Health pages.
+
+Each awake two-hour tick consumes water and adds dirt. Babies consume one food
+unit per tick; older pets consume one every other tick. Meat and vegetables fill
+two units; other foods fill one. Shower clears dirt. The home screen names the
+highest-priority need and gives a rate-limited beep when it changes.
+
+Saves include species, diet, hygiene, illness and metabolism progress. New writes
+start at EEPROM address 16; valid v1 saves migrate from their original location.
+Autosave runs every five real minutes. Press A on the main pet screen before closing.
+The normal build uses real-time minutes; the demo uses one second per game minute.
+Time advances only while running, after the title screen.
+
+These are adapted rules. See the historical references and remaining ideas in
+[ROADMAP.md](ROADMAP.md).
 
 ## Technical Notes
 
